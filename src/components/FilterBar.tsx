@@ -9,6 +9,7 @@ export const FilterBar: React.FC = () => {
     searchQuery,
     setSearchQuery,
     bets,
+    currencySymbol,
   } = useBets()
 
   const liveCount = bets.filter(b => b.status === 'LIVE').length
@@ -71,6 +72,33 @@ export const FilterBar: React.FC = () => {
           )
         })}
       </div>
+
+      {/* Filter Revenue / Status Summary Banner */}
+      {filter === 'WON' && wonCount > 0 && (
+        <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs font-mono text-emerald-300">
+          <span className="flex items-center gap-1.5 font-bold">
+            <span>🎉 Total Cobrado:</span>
+            <span className="text-emerald-400 font-extrabold text-sm">
+              +{currencySymbol}{bets.filter(b => b.status === 'WON').reduce((acc, b) => acc + (b.potentialPayout - b.stake), 0).toFixed(2)}
+            </span>
+          </span>
+          <span className="text-[11px] text-emerald-400/80">
+            {wonCount} {wonCount === 1 ? 'ganada' : 'ganadas'}
+          </span>
+        </div>
+      )}
+
+      {filter === 'LIVE' && liveCount > 0 && (
+        <div className="p-2.5 bg-orange-950/40 border border-orange-500/30 rounded-lg flex items-center justify-between text-xs font-mono text-orange-300">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span>En Juego: {currencySymbol}{bets.filter(b => b.status === 'LIVE').reduce((acc, b) => acc + b.stake, 0).toFixed(2)}</span>
+          </span>
+          <span className="text-orange-400 font-bold">
+            Retorno: {currencySymbol}{bets.filter(b => b.status === 'LIVE').reduce((acc, b) => acc + b.potentialPayout, 0).toFixed(2)}
+          </span>
+        </div>
+      )}
 
     </div>
   )

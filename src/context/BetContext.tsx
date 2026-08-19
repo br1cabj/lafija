@@ -25,11 +25,16 @@ interface BetContextType {
   setSelectedSport: (s: string) => void
   oddsFormat: OddsFormat
   setOddsFormat: (f: OddsFormat) => void
+  currency: 'ARS' | 'USD'
+  setCurrency: (c: 'ARS' | 'USD') => void
+  currencySymbol: string
   isSimulating: boolean
   toggleSimulation: () => void
   liveLogs: LiveEventLog[]
   addBet: (betData: Omit<Bet, 'id' | 'createdAt'>) => void
   deleteBet: (id: string) => void
+  clearAllBets: () => void
+  restoreDemoBets: () => void
   updateCondition: (betId: string, conditionId: string, deltaValue: number) => void
   cashoutBet: (betId: string) => void
   settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void
@@ -38,10 +43,23 @@ interface BetContextType {
 
 const BetContext = createContext<BetContextType | undefined>(undefined)
 
-const STORAGE_KEY = 'betpulse_bets_v1'
-const ODDS_FORMAT_KEY = 'betpulse_odds_format_v1'
+const STORAGE_KEY = 'lafija_bets_v1'
+const ODDS_FORMAT_KEY = 'lafija_odds_format_v1'
+const CURRENCY_KEY = 'lafija_currency_v1'
 
 export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [currency, setCurrencyState] = useState<'ARS' | 'USD'>(() => {
+    const saved = localStorage.getItem(CURRENCY_KEY)
+    return saved === 'USD' ? 'USD' : 'ARS'
+  })
+
+  const setCurrency = (c: 'ARS' | 'USD') => {
+    setCurrencyState(c)
+    localStorage.setItem(CURRENCY_KEY, c)
+  }
+
+  const currencySymbol = currency === 'ARS' ? '$' : 'US$'
+
   const [oddsFormat, setOddsFormatState] = useState<OddsFormat>(() => {
     const saved = localStorage.getItem(ODDS_FORMAT_KEY) as OddsFormat
     return saved === 'american' || saved === 'fractional' || saved === 'implied' ? saved : 'decimal'
@@ -282,6 +300,33 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setBets(prev => prev.filter(b => b.id !== id))
   }
 
+  const clearAllBets = () => {
+    setBets([])
+    setLiveLogs([])
+  }
+
+  const restoreDemoBets = () => {
+    setBets(initialBets)
+    setLiveLogs([
+      {
+        id: `log-${Date.now()}-1`,
+        time: '79:12',
+        betId: 'bet-001',
+        matchTitle: 'Real Madrid vs Man City',
+        text: 'Vinicius Jr remató al arco (2do remate) -> ¡Condición Cumplida!',
+        type: 'CUMPLIDO'
+      },
+      {
+        id: `log-${Date.now()}-2`,
+        time: '75:40',
+        betId: 'bet-001',
+        matchTitle: 'Real Madrid vs Man City',
+        text: 'Córner #7 para Real Madrid. Faltan 2 para cumplir condición.',
+        type: 'CORNER'
+      }
+    ])
+  }
+
   const updateCondition = (betId: string, conditionId: string, deltaValue: number) => {
     setBets(prev => prev.map(bet => {
       if (bet.id !== betId) return bet
@@ -384,11 +429,16 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedSport,
         oddsFormat,
         setOddsFormat,
+        currency,
+        setCurrency,
+        currencySymbol,
         isSimulating,
         toggleSimulation,
         liveLogs,
         addBet,
         deleteBet,
+        clearAllBets,
+        restoreDemoBets,
         updateCondition,
         cashoutBet,
         settleBet,

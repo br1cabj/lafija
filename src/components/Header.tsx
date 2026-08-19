@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useBets } from '../context/BetContext'
 import { useAuth } from '../context/AuthContext'
 import { sounds } from '../utils/audio'
-import { Plus, Zap, BarChart2, User, LogOut, Shield, Volume2, VolumeX } from 'lucide-react'
+import { Plus, Zap, BarChart2, User, LogOut, Shield, Volume2, VolumeX, RotateCcw, Trash2 } from 'lucide-react'
 
 interface HeaderProps {
   onOpenAddModal: () => void
@@ -10,7 +10,17 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsModal }) => {
-  const { stats, isSimulating, toggleSimulation, oddsFormat, setOddsFormat } = useBets()
+  const {
+    stats,
+    isSimulating,
+    toggleSimulation,
+    oddsFormat,
+    setOddsFormat,
+    currency,
+    setCurrency,
+    clearAllBets,
+    restoreDemoBets
+  } = useBets()
   const { user, openAuthModal, signOut } = useAuth()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [isMuted, setIsMuted] = useState(sounds.isMuted)
@@ -108,6 +118,28 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsM
             <BarChart2 className="w-4 h-4" />
           </button>
 
+          {/* Compact Currency Switcher */}
+          <div className="flex items-center bg-[#161822] border border-white/10 rounded p-0.5 text-[11px] font-mono">
+            <button
+              onClick={() => setCurrency('ARS')}
+              className={`px-1.5 py-0.5 rounded transition-all ${
+                currency === 'ARS' ? 'bg-[#FF5500] text-white font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Pesos Argentinos"
+            >
+              ARS
+            </button>
+            <button
+              onClick={() => setCurrency('USD')}
+              className={`px-1.5 py-0.5 rounded transition-all ${
+                currency === 'USD' ? 'bg-[#FF5500] text-white font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+              title="Dólares USD"
+            >
+              USD
+            </button>
+          </div>
+
           {/* User Auth Profile Button / Dropdown */}
           <div className="relative">
             {user ? (
@@ -136,7 +168,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsM
             {showProfileMenu && user && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute right-0 top-8 z-50 bg-[#161822] border border-white/10 rounded-lg shadow-2xl py-2 w-52 text-xs text-slate-200">
+                <div className="absolute right-0 top-8 z-50 bg-[#161822] border border-white/15 rounded-lg shadow-2xl py-2 w-56 text-xs text-slate-200">
                   <div className="px-3 pb-2 border-b border-white/10">
                     <p className="font-bold text-white truncate">{user.name}</p>
                     <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
@@ -146,12 +178,38 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsM
                     </div>
                   </div>
 
+                  {/* Reset / Demo Data Tools */}
+                  <div className="py-1 border-b border-white/10">
+                    <button
+                      onClick={() => {
+                        if (confirm('¿Vaciar todas las apuestas y empezar en blanco?')) {
+                          clearAllBets()
+                          setShowProfileMenu(false)
+                        }
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 flex items-center gap-2 transition-colors text-[11px]"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Vaciar datos / Empezar en blanco</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        restoreDemoBets()
+                        setShowProfileMenu(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 flex items-center gap-2 transition-colors text-[11px]"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Restaurar apuestas de demo</span>
+                    </button>
+                  </div>
+
                   <button
                     onClick={() => {
                       signOut()
                       setShowProfileMenu(false)
                     }}
-                    className="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 flex items-center gap-2 transition-colors mt-1 font-semibold"
+                    className="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5 flex items-center gap-2 transition-colors font-semibold"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Cerrar Sesión</span>
