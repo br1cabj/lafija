@@ -1,0 +1,409 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import type { Bet, UserStats } from '../types/bet'
+import type { OddsFormat } from '../utils/odds'
+import { initialBets, initialStats } from '../data/mockBets'
+import { sounds } from '../utils/audio'
+import confetti from 'canvas-confetti'
+
+export interface LiveEventLog {
+  id: string
+  time: string
+  betId: string
+  matchTitle: string
+  text: string
+  type: 'GOAL' | 'CORNER' | 'CARD' | 'SHOT' | 'CUMPLIDO' | 'CLUTCH' | 'INFO'
+}
+
+interface BetContextType {
+  bets: Bet[]
+  stats: UserStats
+  filter: string
+  setFilter: (f: string) => void
+  searchQuery: string
+  setSearchQuery: (q: string) => void
+  selectedSport: string
+  setSelectedSport: (s: string) => void
+  oddsFormat: OddsFormat
+  setOddsFormat: (f: OddsFormat) => void
+  isSimulating: boolean
+  toggleSimulation: () => void
+  liveLogs: LiveEventLog[]
+  addBet: (betData: Omit<Bet, 'id' | 'createdAt'>) => void
+  deleteBet: (id: string) => void
+  updateCondition: (betId: string, conditionId: string, deltaValue: number) => void
+  cashoutBet: (betId: string) => void
+  settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void
+  recalcStats: () => void
+}
+
+const BetContext = createContext<BetContextType | undefined>(undefined)
+
+const STORAGE_KEY = 'betpulse_bets_v1'
+const ODDS_FORMAT_KEY = 'betpulse_odds_format_v1'
+
+export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [oddsFormat, setOddsFormatState] = useState<OddsFormat>(() => {
+    const saved = localStorage.getItem(ODDS_FORMAT_KEY) as OddsFormat
+    return saved === 'american' || saved === 'fractional' || saved === 'implied' ? saved : 'decimal'
+  })
+
+  const setOddsFormat = (format: OddsFormat) => {
+    setOddsFormatState(format)
+    localStorage.setItem(ODDS_FORMAT_KEY, format)
+  }
+  const [bets, setBets] = useState<Bet[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch {
+        return initialBets
+      }
+    }
+    return initialBets
+  })
+
+  const [stats, setStats] = useState<UserStats>(initialStats)
+  const [filter, setFilter] = useState<string>('ALL')
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [selectedSport, setSelectedSport] = useState<string>('ALL')
+  const [isSimulating, setIsSimulating] = useState<boolean>(false)
+  const [liveLogs, setLiveLogs] = useState<LiveEventLog[]>([
+    {
+      id: 'log-1',
+      time: '79:12',
+      betId: 'bet-001',
+      matchTitle: 'Real Madrid vs Man City',
+      text: 'Vinicius Jr remató al arco (2do remate) -> ¡Condición Cumplida!',
+      type: 'CUMPLIDO'
+    },
+    {
+      id: 'log-2',
+      time: '75:40',
+      betId: 'bet-001',
+      matchTitle: 'Real Madrid vs Man City',
+      text: 'Córner #7 para Real Madrid. Faltan 2 para cumplir condición.',
+      type: 'CORNER'
+    }
+  ])
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bets))
+  }, [bets])
+
+  // Recalculate stats dynamically
+  const recalcStats = useCallback(() => {
+    const totalStaked = bets.reduce((acc, b) => acc + b.stake, 0)
+    const wonBets = bets.filter(b => b.status === 'WON')
+    const lostBets = bets.filter(b => b.status === 'LOST')
+    const cashoutBets = bets.filter(b => b.status === 'CASHOUT')
+    const liveBets = bets.filter(b => b.status === 'LIVE')
+
+    const totalWon = wonBets.reduce((acc, b) => acc + b.potentialPayout, 0) +
+                     cashoutBets.reduce((acc, b) => acc + (b.cashoutValue || 0), 0)
+
+    const settledCount = wonBets.length + lostBets.length + cashoutBets.length
+    const winRate = settledCount > 0 ? (wonBets.length / settledCount) * 100 : 0
+
+    const netProfit = totalWon - (wonBets.reduce((a, b) => a + b.stake, 0) + lostBets.reduce((a, b) => a + b.stake, 0) + cashoutBets.reduce((a, b) => a + b.stake, 0))
+    const roi = totalStaked > 0 ? (netProfit / totalStaked) * 100 : 0
+
+    // Clutch bets are live bets with at least one condition in danger or past minute 75
+    const clutchBets = liveBets.filter(b => 
+      b.conditions.some(c => c.status === 'CLUTCH_DANGER')
+    ).length
+
+    // Faceit rating based on win rate & profit
+    const elo = Math.round(1500 + (winRate * 5) + (netProfit * 0.4))
+    const level = Math.min(10, Math.max(1, Math.floor(elo / 200)))
+
+    setStats(prev => ({
+      ...prev,
+      bankroll: Number((initialStats.initialBankroll + netProfit).toFixed(2)),
+      totalStaked: Number(totalStaked.toFixed(2)),
+      totalWon: Number(totalWon.toFixed(2)),
+      netProfit: Number(netProfit.toFixed(2)),
+      roi: Number(roi.toFixed(2)),
+      yield: Number(roi.toFixed(2)),
+      winRate: Number(winRate.toFixed(1)),
+      activeBets: bets.filter(b => b.status === 'LIVE' || b.status === 'PENDING').length,
+      liveBets: liveBets.length,
+      clutchBets,
+      faceitLevel: level,
+      eloRating: elo,
+    }))
+  }, [bets])
+
+  useEffect(() => {
+    recalcStats()
+  }, [bets, recalcStats])
+
+  // Simulation loop for live game dynamics (corners, goals, minute tick)
+  useEffect(() => {
+    if (!isSimulating) return
+
+    const interval = setInterval(() => {
+      setBets(prevBets => {
+        return prevBets.map(bet => {
+          if (bet.status !== 'LIVE') return bet
+
+          // Random minute increment
+          const currentMin = parseInt(bet.match.minute?.replace("'", "") || '50', 10)
+          const newMin = currentMin < 90 ? currentMin + 1 : 90
+
+          // Update conditions randomly
+          const updatedConditions = bet.conditions.map(cond => {
+            if (cond.isLock || cond.status === 'MET') return cond
+
+            // If it's a numeric condition like corners/shots/cards
+            if (typeof cond.targetValue === 'number' && typeof cond.currentValue === 'number') {
+              const shouldIncrement = Math.random() > 0.6
+              if (shouldIncrement) {
+                const nextVal = cond.currentValue + 1
+                const nextProgress = Math.min(100, Math.round((nextVal / cond.targetValue) * 100))
+                const isNowMet = nextVal >= cond.targetValue
+
+                if (isNowMet) {
+                  sounds.playHitSound()
+                  // Trigger log
+                  setLiveLogs(logs => [
+                    {
+                      id: `log-${Date.now()}`,
+                      time: `${newMin}'`,
+                      betId: bet.id,
+                      matchTitle: `${bet.match.homeTeam} vs ${bet.match.awayTeam}`,
+                      text: `🎯 ¡HIT! ${cond.selection} alcanzado (${nextVal}/${cond.targetValue})`,
+                      type: 'CUMPLIDO'
+                    },
+                    ...logs.slice(0, 19)
+                  ])
+                } else {
+                  setLiveLogs(logs => [
+                    {
+                      id: `log-${Date.now()}`,
+                      time: `${newMin}'`,
+                      betId: bet.id,
+                      matchTitle: `${bet.match.homeTeam} vs ${bet.match.awayTeam}`,
+                      text: `⚡ Progreso en ${cond.market}: ${nextVal}/${cond.targetValue} ${cond.unit || ''}`,
+                      type: 'CORNER'
+                    },
+                    ...logs.slice(0, 19)
+                  ])
+                }
+
+                return {
+                  ...cond,
+                  currentValue: nextVal,
+                  progress: nextProgress,
+                  status: isNowMet ? ('MET' as const) : (newMin > 80 ? 'CLUTCH_DANGER' as const : 'IN_PROGRESS' as const),
+                  isLock: isNowMet
+                }
+              }
+            }
+
+            // If time is late, flag clutch danger
+            if (newMin >= 80 && cond.status === 'IN_PROGRESS') {
+              sounds.playDangerSound()
+              return {
+                ...cond,
+                status: 'CLUTCH_DANGER' as const,
+                dangerNote: `⚠️ TIEMPO CRÍTICO: ${newMin}' - Faltan condiciones`
+              }
+            }
+
+            return cond
+          })
+
+          // Check if all conditions are met
+          const allMet = updatedConditions.every(c => c.status === 'MET')
+          if (allMet && bet.status === 'LIVE') {
+            sounds.playWinSound()
+            confetti({
+              particleCount: 80,
+              spread: 70,
+              origin: { y: 0.6 }
+            })
+            return {
+              ...bet,
+              match: { ...bet.match, minute: `${newMin}'` },
+              conditions: updatedConditions,
+              status: 'WON'
+            }
+          }
+
+          // Dynamic cashout value variation
+          const metCount = updatedConditions.filter(c => c.status === 'MET').length
+          const ratio = metCount / updatedConditions.length
+          const dynamicCashout = Math.round(bet.stake * (1 + ratio * (bet.odds - 1) * 0.85) * 100) / 100
+
+          return {
+            ...bet,
+            match: {
+              ...bet.match,
+              minute: `${newMin}'`
+            },
+            cashoutValue: dynamicCashout,
+            conditions: updatedConditions
+          }
+        })
+      })
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [isSimulating])
+
+  const toggleSimulation = () => {
+    setIsSimulating(prev => !prev)
+  }
+
+  const addBet = (betData: Omit<Bet, 'id' | 'createdAt'>) => {
+    const newBet: Bet = {
+      ...betData,
+      id: `bet-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    }
+    setBets(prev => [newBet, ...prev])
+    
+    setLiveLogs(logs => [
+      {
+        id: `log-${Date.now()}`,
+        time: 'AHORA',
+        betId: newBet.id,
+        matchTitle: `${newBet.match.homeTeam} vs ${newBet.match.awayTeam}`,
+        text: `Registrada nueva apuesta: Cuota ${newBet.odds.toFixed(2)} [Stake $${newBet.stake}]`,
+        type: 'INFO'
+      },
+      ...logs.slice(0, 19)
+    ])
+  }
+
+  const deleteBet = (id: string) => {
+    setBets(prev => prev.filter(b => b.id !== id))
+  }
+
+  const updateCondition = (betId: string, conditionId: string, deltaValue: number) => {
+    setBets(prev => prev.map(bet => {
+      if (bet.id !== betId) return bet
+
+      const newConditions = bet.conditions.map(cond => {
+        if (cond.id !== conditionId) return cond
+        if (typeof cond.currentValue === 'number' && typeof cond.targetValue === 'number') {
+          const updatedVal = Math.max(0, cond.currentValue + deltaValue)
+          const isMet = updatedVal >= cond.targetValue
+          const progress = Math.min(100, Math.round((updatedVal / cond.targetValue) * 100))
+
+          return {
+            ...cond,
+            currentValue: updatedVal,
+            progress,
+            status: isMet ? ('MET' as const) : ('IN_PROGRESS' as const),
+            isLock: isMet
+          }
+        }
+        return cond
+      })
+
+      const allMet = newConditions.every(c => c.status === 'MET')
+      if (allMet) {
+        sounds.playWinSound()
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.6 }
+        })
+      } else if (deltaValue > 0) {
+        sounds.playHitSound()
+      }
+
+      return {
+        ...bet,
+        status: allMet ? 'WON' : bet.status,
+        conditions: newConditions
+      }
+    }))
+  }
+
+  const cashoutBet = (betId: string) => {
+    sounds.playClickSound()
+    setBets(prev => prev.map(bet => {
+      if (bet.id === betId) {
+        return {
+          ...bet,
+          status: 'CASHOUT'
+        }
+      }
+      return bet
+    }))
+
+    setLiveLogs(logs => [
+      {
+        id: `log-${Date.now()}`,
+        time: 'CASHOUT',
+        betId,
+        matchTitle: 'Cashout Ejecutado',
+        text: `Apuesta cerrada exitosamente asegurando ganancia`,
+        type: 'INFO'
+      },
+      ...logs.slice(0, 19)
+    ])
+  }
+
+  const settleBet = (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => {
+    setBets(prev => prev.map(bet => {
+      if (bet.id === betId) {
+        if (outcome === 'WON') {
+          sounds.playWinSound()
+          confetti({
+            particleCount: 100,
+            spread: 90,
+            origin: { y: 0.5 }
+          })
+        } else {
+          sounds.playClickSound()
+        }
+        return {
+          ...bet,
+          status: outcome
+        }
+      }
+      return bet
+    }))
+  }
+
+  return (
+    <BetContext.Provider
+      value={{
+        bets,
+        stats,
+        filter,
+        setFilter,
+        searchQuery,
+        setSearchQuery,
+        selectedSport,
+        setSelectedSport,
+        oddsFormat,
+        setOddsFormat,
+        isSimulating,
+        toggleSimulation,
+        liveLogs,
+        addBet,
+        deleteBet,
+        updateCondition,
+        cashoutBet,
+        settleBet,
+        recalcStats,
+      }}
+    >
+      {children}
+    </BetContext.Provider>
+  )
+}
+
+export const useBets = () => {
+  const context = useContext(BetContext)
+  if (!context) {
+    throw new Error('useBets must be used within a BetProvider')
+  }
+  return context
+}
