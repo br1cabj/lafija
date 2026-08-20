@@ -1,7 +1,7 @@
 {
   "name": "LA FIJA - Tracker de Apuestas en Vivo",
   "short_name": "LA FIJA",
-  "description": "Tracker en tiempo real de apuestas deportivas y desglose de condiciones estilo FACEIT",
+  "description": "Tracker en tiempo real",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0C10",
