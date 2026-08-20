@@ -11,6 +11,7 @@ import { AnalyticsModal } from './components/AnalyticsModal'
 import { AuthModal } from './components/AuthModal'
 import { ShareTicketModal } from './components/ShareTicketModal'
 import { MobileNav } from './components/MobileNav'
+import { LiveFeedSidebar } from './components/LiveFeedSidebar'
 import type { Bet } from './types/bet'
 import { Plus, ShieldCheck, Zap } from 'lucide-react'
 
@@ -71,58 +72,67 @@ const DashboardContent: React.FC = () => {
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
       />
 
-      {/* Main Container (Centered, Clean, Focused) */}
-      <main className="max-w-2xl mx-auto px-4 py-4">
+      {/* Main Container */}
+      <main className="max-w-5xl mx-auto px-4 py-4">
         
         {/* Compact 3-Stat Strip */}
         <StatsOverview />
 
-        {/* Minimal Filters */}
-        <FilterBar />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4">
+          
+          {/* Main Bet Feed Column */}
+          <div className="lg:col-span-2 space-y-3">
+            {/* Minimal Filters */}
+            <FilterBar />
 
-        {/* Bet Cards Feed */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-mono text-slate-400">
-              {filteredBets.length} {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
-            </span>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-mono text-slate-400">
+                {filteredBets.length} {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
+              </span>
 
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="text-xs font-mono font-bold text-[#FF5500] hover:text-orange-400 flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Nueva Apuesta</span>
-            </button>
-          </div>
-
-          {filteredBets.length === 0 ? (
-            <div className="bg-[#12141C] border border-dashed border-white/10 rounded-lg p-8 text-center">
-              <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5">
-                <Zap className="w-5 h-5" />
-              </div>
-              <h3 className="text-sm font-bold text-white mb-1">
-                No hay apuestas en esta vista
-              </h3>
-              <p className="text-xs text-slate-400 mb-3">
-                Añade una nueva apuesta para iniciar el seguimiento en vivo.
-              </p>
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-3.5 py-1.5 bg-[#FF5500] hover:bg-[#FF661A] text-white text-xs font-bold uppercase rounded shadow"
+                className="text-xs font-mono font-bold text-[#FF5500] hover:text-orange-400 flex items-center gap-1"
               >
-                + Crear Apuesta
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nueva Apuesta</span>
               </button>
             </div>
-          ) : (
-            filteredBets.map(bet => (
-              <BetCard
-                key={bet.id}
-                bet={bet}
-                onShare={(targetBet) => setSelectedBetForShare(targetBet)}
-              />
-            ))
-          )}
+
+            {filteredBets.length === 0 ? (
+              <div className="bg-[#12141C] border border-dashed border-white/10 rounded-lg p-8 text-center">
+                <div className="w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-white mb-1">
+                  No hay apuestas en esta vista
+                </h3>
+                <p className="text-xs text-slate-400 mb-3">
+                  Añade una nueva apuesta para iniciar el seguimiento en vivo.
+                </p>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="px-3.5 py-1.5 bg-[#FF5500] hover:bg-[#FF661A] text-white text-xs font-bold uppercase rounded shadow"
+                >
+                  + Crear Apuesta
+                </button>
+              </div>
+            ) : (
+              filteredBets.map(bet => (
+                <BetCard
+                  key={bet.id}
+                  bet={bet}
+                  onShare={(targetBet) => setSelectedBetForShare(targetBet)}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Desktop Right Sidebar */}
+          <div className="hidden lg:block lg:col-span-1">
+            <LiveFeedSidebar />
+          </div>
+
         </div>
 
       </main>

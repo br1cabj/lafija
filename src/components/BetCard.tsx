@@ -14,7 +14,9 @@ import {
   Share2,
   ChevronDown,
   ChevronUp,
-  Flame
+  Flame,
+  Play,
+  RotateCcw
 } from 'lucide-react'
 
 interface BetCardProps {
@@ -23,7 +25,7 @@ interface BetCardProps {
 }
 
 export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
-  const { updateCondition, cashoutBet, settleBet, deleteBet, oddsFormat, currencySymbol } = useBets()
+  const { updateCondition, cashoutBet, settleBet, setBetStatus, deleteBet, oddsFormat, currencySymbol } = useBets()
   const [showMenu, setShowMenu] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -127,7 +129,16 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
             {showMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-                <div className="absolute right-0 top-7 z-20 bg-[#1A1D28] border border-white/15 rounded-md shadow-2xl py-1 w-36 text-xs text-slate-200">
+                <div className="absolute right-0 top-7 z-20 bg-[#1A1D28] border border-white/15 rounded-md shadow-2xl py-1 w-44 text-xs text-slate-200">
+                  {bet.status === 'PENDING' && (
+                    <button
+                      onClick={() => { setBetStatus(bet.id, 'LIVE'); setShowMenu(false) }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-white/10 text-orange-400 flex items-center gap-1.5 font-semibold"
+                    >
+                      <Play className="w-3.5 h-3.5" /> Iniciar En Vivo
+                    </button>
+                  )}
+
                   {bet.status === 'LIVE' && (
                     <>
                       <button
@@ -142,8 +153,24 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
                       >
                         <XCircle className="w-3.5 h-3.5" /> Perdida
                       </button>
+                      <button
+                        onClick={() => { setBetStatus(bet.id, 'PENDING'); setShowMenu(false) }}
+                        className="w-full text-left px-3 py-1.5 hover:bg-white/10 text-slate-300 flex items-center gap-1.5"
+                      >
+                        <Clock className="w-3.5 h-3.5" /> Pausar (Pre-Match)
+                      </button>
                     </>
                   )}
+
+                  {(bet.status === 'WON' || bet.status === 'LOST' || bet.status === 'CASHOUT') && (
+                    <button
+                      onClick={() => { setBetStatus(bet.id, 'LIVE'); setShowMenu(false) }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 font-semibold"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reactivar a En Vivo
+                    </button>
+                  )}
+
                   <button
                     onClick={() => { deleteBet(bet.id); setShowMenu(false) }}
                     className="w-full text-left px-3 py-1.5 hover:bg-red-950/50 text-red-400 flex items-center gap-1.5 border-t border-white/10 font-semibold"
@@ -182,7 +209,7 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
         </div>
         <div className="text-center">
           <span className="text-slate-400 text-[10px] uppercase font-bold block">
-            Cuota ({oddsFormat === 'decimal' ? 'DEC' : oddsFormat === 'american' ? 'AME' : 'FRA'})
+            Cuota ({oddsFormat === 'decimal' ? 'DEC' : oddsFormat === 'american' ? 'AME' : oddsFormat === 'fractional' ? 'FRA' : 'IMP'})
           </span>
           <span className="font-black text-orange-400 text-xs">{formatOdds(bet.odds, oddsFormat)}</span>
         </div>

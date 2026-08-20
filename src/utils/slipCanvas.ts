@@ -5,7 +5,11 @@ import { formatOdds, type OddsFormat } from './odds'
  * High-Impact, Compact, Bold 2D Canvas Slip for "LA FIJA".
  * Optimized for mobile screens, high legibility and instant rendering.
  */
-export async function generateSlipBlob(bet: Bet, oddsFormat: OddsFormat): Promise<{ blob: Blob; dataUrl: string }> {
+export async function generateSlipBlob(
+  bet: Bet,
+  oddsFormat: OddsFormat,
+  currencySymbol: string = '$'
+): Promise<{ blob: Blob; dataUrl: string }> {
   const canvas = document.createElement('canvas')
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Canvas context not available')
@@ -68,15 +72,22 @@ export async function generateSlipBlob(bet: Bet, oddsFormat: OddsFormat): Promis
   ctx.fillText(bet.bookmaker, width - 87, 44)
 
   // 3. Match Header (Big & Bold)
+  const betTypeLabel = bet.type === 'bet_builder' ? 'BET BUILDER' : bet.type === 'single' ? 'APUESTA SIMPLE' : 'COMBINADA'
   ctx.textAlign = 'left'
   ctx.fillStyle = '#94A3B8'
   ctx.font = 'bold 11px system-ui, -apple-system, sans-serif'
-  ctx.fillText(`${bet.league.toUpperCase()} • ${bet.type === 'bet_builder' ? 'BET BUILDER' : 'COMBINADA'}`, 24, 80)
+  ctx.fillText(`${bet.league.toUpperCase()} • ${betTypeLabel}`, 24, 80)
 
-  // Teams Title
+  // Teams Title (Dynamic font-size scaling to prevent overflow)
+  const teamsText = `${bet.match.homeTeam} vs ${bet.match.awayTeam}`
+  let fontSize = 22
+  ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`
+  while (ctx.measureText(teamsText).width > (width - 48) && fontSize > 14) {
+    fontSize -= 1
+    ctx.font = `900 ${fontSize}px system-ui, -apple-system, sans-serif`
+  }
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = '900 22px system-ui, -apple-system, sans-serif'
-  ctx.fillText(`${bet.match.homeTeam} vs ${bet.match.awayTeam}`, 24, 108)
+  ctx.fillText(teamsText, 24, 108)
 
   // 4. Conditions List Container
   const condY = 124
@@ -155,7 +166,7 @@ export async function generateSlipBlob(bet: Bet, oddsFormat: OddsFormat): Promis
   ctx.fillText('STAKE', 24 + colW * 0.5, finY + 30)
   ctx.fillStyle = '#FFFFFF'
   ctx.font = '900 20px monospace'
-  ctx.fillText(`$${bet.stake.toFixed(2)}`, 24 + colW * 0.5, finY + 62)
+  ctx.fillText(`${currencySymbol}${bet.stake.toFixed(2)}`, 24 + colW * 0.5, finY + 62)
 
   // Col 2: Cuota
   ctx.fillStyle = '#64748B'
@@ -171,7 +182,7 @@ export async function generateSlipBlob(bet: Bet, oddsFormat: OddsFormat): Promis
   ctx.fillText('RETORNO', 24 + colW * 2.5, finY + 30)
   ctx.fillStyle = '#10B981'
   ctx.font = '900 24px monospace'
-  ctx.fillText(`$${bet.potentialPayout.toFixed(2)}`, 24 + colW * 2.5, finY + 62)
+  ctx.fillText(`${currencySymbol}${bet.potentialPayout.toFixed(2)}`, 24 + colW * 2.5, finY + 62)
 
   // 6. Watermark Footer
   const footY = finY + financialsHeight + 24

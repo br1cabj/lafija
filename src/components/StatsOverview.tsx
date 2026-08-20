@@ -22,12 +22,12 @@ export const StatsOverview: React.FC = () => {
       {/* Stat 2: Beneficio */}
       <div className="text-center flex-1">
         <span className="text-[10px] uppercase tracking-wider text-slate-300 font-bold block">
-          Ganancia ({stats.roi > 0 ? `+${stats.roi}%` : `${stats.roi}%`})
+          Ganancia ({stats.roi >= 0 ? `+${stats.roi}%` : `${stats.roi}%`})
         </span>
         <span className={`text-lg sm:text-xl font-bold font-mono-numbers ${
           stats.netProfit >= 0 ? 'text-[#00E676]' : 'text-[#FF3344]'
         }`}>
-          {stats.netProfit >= 0 ? '+' : ''}{currencySymbol}{stats.netProfit.toFixed(2)}
+          {stats.netProfit >= 0 ? '+' : '-'}{currencySymbol}{Math.abs(stats.netProfit).toFixed(2)}
         </span>
       </div>
 

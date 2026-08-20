@@ -8,15 +8,15 @@ interface AnalyticsModalProps {
 }
 
 export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose }) => {
-  const { stats, bets } = useBets()
+  const { stats, bets, currencySymbol } = useBets()
 
   if (!isOpen) return null
 
-  const sportsMap: { [key: string]: { label: string; bets: number; won: number; profit: number } } = {
-    football: { label: '⚽ Fútbol (Champions & Ligas)', bets: 0, won: 0, profit: 0 },
-    basketball: { label: '🏀 Baloncesto (NBA / Euroliga)', bets: 0, won: 0, profit: 0 },
-    tennis: { label: '🎾 Tenis (ATP / WTA)', bets: 0, won: 0, profit: 0 },
-    esports: { label: '🎮 Esports (CS2 / LoL)', bets: 0, won: 0, profit: 0 }
+  const sportsMap: { [key: string]: { label: string; bets: number; settled: number; won: number; profit: number } } = {
+    football: { label: '⚽ Fútbol (Champions & Ligas)', bets: 0, settled: 0, won: 0, profit: 0 },
+    basketball: { label: '🏀 Baloncesto (NBA / Euroliga)', bets: 0, settled: 0, won: 0, profit: 0 },
+    tennis: { label: '🎾 Tenis (ATP / WTA)', bets: 0, settled: 0, won: 0, profit: 0 },
+    esports: { label: '🎮 Esports (CS2 / LoL)', bets: 0, settled: 0, won: 0, profit: 0 }
   }
 
   bets.forEach(b => {
@@ -24,10 +24,13 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     s.bets += 1
     if (b.status === 'WON') {
       s.won += 1
+      s.settled += 1
       s.profit += (b.potentialPayout - b.stake)
     } else if (b.status === 'LOST') {
+      s.settled += 1
       s.profit -= b.stake
     } else if (b.status === 'CASHOUT') {
+      s.settled += 1
       s.profit += ((b.cashoutValue || b.stake) - b.stake)
     }
   })
@@ -37,7 +40,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
     ? computedBreakdown.map(s => ({
         sport: s.label,
         bets: s.bets,
-        winRate: Math.round((s.won / s.bets) * 100),
+        winRate: s.settled > 0 ? Math.round((s.won / s.settled) * 100) : 0,
         profit: Number(s.profit.toFixed(2))
       }))
     : [
@@ -115,19 +118,21 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 font-mono-numbers">
           <div className="p-3 bg-[#0B0C10] rounded border border-white/5">
             <span className="text-[10px] text-slate-500 uppercase block font-sans">Total Apostado</span>
-            <span className="text-base font-bold text-white">${stats.totalStaked.toFixed(2)}</span>
+            <span className="text-base font-bold text-white">{currencySymbol}{stats.totalStaked.toFixed(2)}</span>
           </div>
           <div className="p-3 bg-[#0B0C10] rounded border border-white/5">
             <span className="text-[10px] text-slate-500 uppercase block font-sans">Total Retornado</span>
-            <span className="text-base font-bold text-emerald-400">${stats.totalWon.toFixed(2)}</span>
+            <span className="text-base font-bold text-emerald-400">{currencySymbol}{stats.totalWon.toFixed(2)}</span>
           </div>
           <div className="p-3 bg-[#0B0C10] rounded border border-white/5">
             <span className="text-[10px] text-slate-500 uppercase block font-sans">Yield / ROI</span>
-            <span className="text-base font-bold text-orange-400">+{stats.roi}%</span>
+            <span className="text-base font-bold text-orange-400">{stats.roi >= 0 ? `+${stats.roi}%` : `${stats.roi}%`}</span>
           </div>
           <div className="p-3 bg-[#0B0C10] rounded border border-white/5">
             <span className="text-[10px] text-slate-500 uppercase block font-sans">Beneficio Neto</span>
-            <span className="text-base font-bold text-emerald-400">+${stats.netProfit.toFixed(2)}</span>
+            <span className={`text-base font-bold ${stats.netProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {stats.netProfit >= 0 ? '+' : '-'}{currencySymbol}{Math.abs(stats.netProfit).toFixed(2)}
+            </span>
           </div>
         </div>
 
@@ -151,7 +156,9 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({ isOpen, onClose 
                   </div>
                   <div className="text-right">
                     <span className="text-slate-400 text-[10px] block">Ganancia</span>
-                    <span className="font-bold text-emerald-400">+${sb.profit.toFixed(2)}</span>
+                    <span className={`font-bold ${sb.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {sb.profit >= 0 ? '+' : '-'}{currencySymbol}{Math.abs(sb.profit).toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>

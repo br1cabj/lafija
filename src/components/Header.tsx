@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useBets } from '../context/BetContext'
 import { useAuth } from '../context/AuthContext'
 import { sounds } from '../utils/audio'
-import { Plus, Zap, BarChart2, User, LogOut, Shield, Volume2, VolumeX, RotateCcw, Trash2 } from 'lucide-react'
+import { Plus, Zap, BarChart2, User, LogOut, Shield, Volume2, VolumeX, RotateCcw, Trash2, DollarSign } from 'lucide-react'
 
 interface HeaderProps {
   onOpenAddModal: () => void
@@ -12,12 +12,15 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsModal }) => {
   const {
     stats,
+    initialBankroll,
+    setInitialBankroll,
     isSimulating,
     toggleSimulation,
     oddsFormat,
     setOddsFormat,
     currency,
     setCurrency,
+    currencySymbol,
     clearAllBets,
     restoreDemoBets
   } = useBets()
@@ -80,6 +83,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsM
               }`}
             >
               FRA
+            </button>
+            <button
+              onClick={() => setOddsFormat('implied')}
+              className={`hidden md:block px-2 py-0.5 rounded transition-all ${
+                oddsFormat === 'implied' ? 'bg-[#FF5500] text-white font-bold' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              IMP
             </button>
           </div>
 
@@ -180,6 +191,22 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAddModal, onOpenAnalyticsM
 
                   {/* Reset / Demo Data Tools */}
                   <div className="py-1 border-b border-white/10">
+                    <button
+                      onClick={() => {
+                        const input = prompt('Ingresa tu Bankroll inicial:', String(initialBankroll))
+                        if (input !== null) {
+                          const val = parseFloat(input)
+                          if (!isNaN(val) && val >= 0) {
+                            setInitialBankroll(val)
+                          }
+                        }
+                        setShowProfileMenu(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 flex items-center gap-2 transition-colors text-[11px]"
+                    >
+                      <DollarSign className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Ajustar Bankroll inicial ({currencySymbol}{initialBankroll.toFixed(2)})</span>
+                    </button>
                     <button
                       onClick={() => {
                         if (confirm('¿Vaciar todas las apuestas y empezar en blanco?')) {

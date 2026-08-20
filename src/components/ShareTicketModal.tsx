@@ -11,7 +11,7 @@ interface ShareTicketModalProps {
 }
 
 export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({ bet, isOpen, onClose }) => {
-  const { oddsFormat } = useBets()
+  const { oddsFormat, currencySymbol } = useBets()
   const [imageBlob, setImageBlob] = useState<Blob | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -32,7 +32,7 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({ bet, isOpen,
     setErrorMessage(null)
 
     // Generate instantaneously via pure 2D Canvas
-    generateSlipBlob(bet, oddsFormat)
+    generateSlipBlob(bet, oddsFormat, currencySymbol)
       .then(({ blob, dataUrl }) => {
         if (isMounted) {
           setImageBlob(blob)

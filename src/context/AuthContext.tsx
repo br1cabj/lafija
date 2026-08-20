@@ -17,18 +17,18 @@ interface AuthContextType {
   closeAuthModal: () => void
   signInWithEmail: (email: string, pass: string) => Promise<{ error?: string }>
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<{ error?: string }>
-  signInWithGoogle: () => Promise<{ error?: string }>
   signOut: () => Promise<void>
   signInAsGuest: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const AUTH_USER_KEY = 'betpulse_auth_user_v1'
+const AUTH_USER_KEY = 'lafija_auth_user_v1'
+const LEGACY_AUTH_KEY = 'betpulse_auth_user_v1'
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem(AUTH_USER_KEY)
+    const saved = localStorage.getItem(AUTH_USER_KEY) || localStorage.getItem(LEGACY_AUTH_KEY)
     if (saved) {
       try {
         return JSON.parse(saved)
@@ -39,7 +39,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Default demo tipster profile
     return {
       id: 'usr-demo-1',
-      email: 'tipster@betpulse.pro',
+      email: 'tipster@lafija.pro',
       name: 'Bruno Tipster',
       avatarUrl: '',
       isGuest: false
@@ -68,7 +68,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     })
 
-    // Listen for auth changes (e.g. after Google OAuth redirect)
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         const profile: UserProfile = {
@@ -153,38 +153,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  const signInWithGoogle = async (): Promise<{ error?: string }> => {
-    setLoading(true)
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin
-          }
-        })
-        if (error) throw error
-      } else {
-        // Fallback simulation for local dev
-        const profile: UserProfile = {
-          id: `usr-google-${Date.now()}`,
-          email: 'usuario.google@gmail.com',
-          name: 'Usuario Google (Demo)',
-          avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-          isGuest: false
-        }
-        setUser(profile)
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profile))
-      }
-      closeAuthModal()
-      return {}
-    } catch (err: any) {
-      return { error: err.message || 'Error con Google Sign-In' }
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const signOut = async () => {
     if (isSupabaseConfigured && supabase) {
       await supabase.auth.signOut()
@@ -196,7 +164,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInAsGuest = () => {
     const profile: UserProfile = {
       id: 'usr-guest',
-      email: 'invitado@betpulse.app',
+      email: 'invitado@lafija.app',
       name: 'Modo Invitado',
       isGuest: true
     }
@@ -215,7 +183,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         closeAuthModal,
         signInWithEmail,
         signUpWithEmail,
-        signInWithGoogle,
         signOut,
         signInAsGuest,
       }}

@@ -112,3 +112,9 @@ export function parseInputToDecimal(input: string, format: OddsFormat): number {
 
   return 1.0
 }
+
+export function convertOddsInput(currentValue: string, fromFormat: OddsFormat, toFormat: OddsFormat): string {
+  if (!currentValue || currentValue.trim() === '') return ''
+  const decimal = parseInputToDecimal(currentValue, fromFormat)
+  return formatOdds(decimal, toFormat)
+}

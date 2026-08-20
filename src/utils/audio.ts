@@ -5,7 +5,7 @@ class SoundEngine {
   public isMuted: boolean = false
 
   constructor() {
-    const saved = localStorage.getItem('betpulse_sound_muted')
+    const saved = localStorage.getItem('lafija_sound_muted') || localStorage.getItem('betpulse_sound_muted')
     this.isMuted = saved === 'true'
 
     if (typeof window !== 'undefined') {
@@ -35,7 +35,7 @@ class SoundEngine {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted
-    localStorage.setItem('betpulse_sound_muted', String(this.isMuted))
+    localStorage.setItem('lafija_sound_muted', String(this.isMuted))
     return this.isMuted
   }
 

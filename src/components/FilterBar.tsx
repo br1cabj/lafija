@@ -77,7 +77,7 @@ export const FilterBar: React.FC = () => {
       {filter === 'WON' && wonCount > 0 && (
         <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs font-mono text-emerald-300">
           <span className="flex items-center gap-1.5 font-bold">
-            <span>🎉 Total Cobrado:</span>
+            <span>🎉 Ganancia Neta:</span>
             <span className="text-emerald-400 font-extrabold text-sm">
               +{currencySymbol}{bets.filter(b => b.status === 'WON').reduce((acc, b) => acc + (b.potentialPayout - b.stake), 0).toFixed(2)}
             </span>

@@ -7,9 +7,10 @@ import {
   type OddsFormat,
   decimalToAmerican,
   decimalToFractional,
-  decimalToImpliedProbability
+  decimalToImpliedProbability,
+  convertOddsInput
 } from '../utils/odds'
-import { X, Plus, Trash2, Zap, Sparkles } from 'lucide-react'
+import { X, Plus, Trash2, Zap, Sparkles, Radio, Calendar } from 'lucide-react'
 
 interface AddBetModalProps {
   isOpen: boolean
@@ -19,6 +20,7 @@ interface AddBetModalProps {
 export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => {
   const { addBet, oddsFormat: globalOddsFormat } = useBets()
 
+  const [matchStatus, setMatchStatus] = useState<'LIVE' | 'PENDING'>('LIVE')
   const [sport, setSport] = useState<SportType>('football')
   const [league, setLeague] = useState('UEFA Champions League')
   const [homeTeam, setHomeTeam] = useState('')
@@ -86,11 +88,20 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
         const cur = Number(copy[index].currentValue) || 0
         const tar = Number(copy[index].targetValue) || 1
         copy[index].progress = Math.min(100, Math.round((cur / tar) * 100))
-        copy[index].status = cur >= tar ? 'MET' : 'IN_PROGRESS'
+        copy[index].status = cur >= tar ? 'MET' : (matchStatus === 'PENDING' ? 'PENDING' : 'IN_PROGRESS')
         copy[index].isLock = cur >= tar
       }
       return copy
     })
+  }
+
+  const handleFormatChange = (newFormat: OddsFormat) => {
+    if (newFormat === inputOddsFormat) return
+    const converted = convertOddsInput(oddsInput, inputOddsFormat, newFormat)
+    setInputOddsFormat(newFormat)
+    if (converted) {
+      setOddsInput(converted)
+    }
   }
 
   const addPreset = (market: string, selection: string, targetValue: number, unit: string) => {
@@ -103,7 +114,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
         currentValue: 0,
         progress: 0,
         unit,
-        status: 'IN_PROGRESS',
+        status: matchStatus === 'PENDING' ? 'PENDING' : 'IN_PROGRESS',
         isLock: false
       }
     ])
@@ -116,9 +127,12 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
+    const isLive = matchStatus === 'LIVE'
+
     const mappedConditions: BetCondition[] = conditions.map((c, i) => ({
       ...c,
-      id: `cond-${Date.now()}-${i}`
+      id: `cond-${Date.now()}-${i}`,
+      status: c.status === 'MET' ? 'MET' : (isLive ? 'IN_PROGRESS' : 'PENDING')
     }))
 
     addBet({
@@ -129,11 +143,11 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
       match: {
         homeTeam: homeTeam || 'Equipo Local',
         awayTeam: awayTeam || 'Equipo Visitante',
-        homeScore: 0,
-        awayScore: 0,
-        minute: "01'",
-        period: '1H',
-        status: 'LIVE',
+        homeScore: isLive ? 0 : undefined,
+        awayScore: isLive ? 0 : undefined,
+        minute: isLive ? "01'" : undefined,
+        period: isLive ? '1H' : 'PRE',
+        status: isLive ? 'LIVE' : 'SCHEDULED',
         startTime: new Date().toISOString(),
         league: league || 'Liga Principal'
       },
@@ -141,8 +155,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
       odds: decimalOdds,
       potentialPayout,
       bookmaker: bookmaker || 'Bet365',
-      status: 'LIVE',
-      cashoutValue: parsedStake * 0.9,
+      status: isLive ? 'LIVE' : 'PENDING',
+      cashoutValue: isLive ? parsedStake * 0.9 : null,
       conditions: mappedConditions,
       notes: '',
       tags: [sport, betType, bookmaker]
@@ -194,6 +208,34 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
+          {/* Match Status Selector (En Vivo vs Pre-Partido) */}
+          <div className="flex bg-[#0B0C10] p-1 rounded-lg border border-white/10 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => setMatchStatus('LIVE')}
+              className={`flex-1 py-1.5 rounded-md transition-all font-bold flex items-center justify-center gap-1.5 ${
+                matchStatus === 'LIVE'
+                  ? 'bg-red-600 text-white shadow-sm shadow-red-950/50'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Radio className={`w-3.5 h-3.5 ${matchStatus === 'LIVE' ? 'animate-pulse' : ''}`} />
+              <span>En Vivo (Comenzó)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMatchStatus('PENDING')}
+              className={`flex-1 py-1.5 rounded-md transition-all font-bold flex items-center justify-center gap-1.5 ${
+                matchStatus === 'PENDING'
+                  ? 'bg-[#FF5500] text-white shadow-sm shadow-orange-950/50'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Pre-Partido (Programado)</span>
+            </button>
+          </div>
+
           {/* Match & Sport info */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
@@ -281,7 +323,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
               <div className="flex items-center bg-[#161822] border border-white/10 rounded p-0.5 text-[11px] font-mono">
                 <button
                   type="button"
-                  onClick={() => setInputOddsFormat('decimal')}
+                  onClick={() => handleFormatChange('decimal')}
                   className={`px-2.5 py-1 rounded transition-all ${
                     inputOddsFormat === 'decimal'
                       ? 'bg-[#FF5500] text-white font-bold'
@@ -292,7 +334,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setInputOddsFormat('american')}
+                  onClick={() => handleFormatChange('american')}
                   className={`px-2.5 py-1 rounded transition-all ${
                     inputOddsFormat === 'american'
                       ? 'bg-[#FF5500] text-white font-bold'
@@ -303,7 +345,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setInputOddsFormat('fractional')}
+                  onClick={() => handleFormatChange('fractional')}
                   className={`px-2.5 py-1 rounded transition-all ${
                     inputOddsFormat === 'fractional'
                       ? 'bg-[#FF5500] text-white font-bold'
@@ -314,7 +356,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({ isOpen, onClose }) => 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setInputOddsFormat('implied')}
+                  onClick={() => handleFormatChange('implied')}
                   className={`px-2.5 py-1 rounded transition-all ${
                     inputOddsFormat === 'implied'
                       ? 'bg-[#FF5500] text-white font-bold'

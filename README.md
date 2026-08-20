@@ -14,7 +14,7 @@
 - **🧮 Motor Multiformato de Cuotas:** Conversión y visualización instantánea en **Decimal (`2.50`)**, **Americana (`+150`)**, **Fraccional (`3/2`)** y **Probabilidad Implícita (`40%`)**.
 - **📸 Exportador de Boletos Oficiales (Canvas 2D):** Genera imágenes PNG en alta definición (2x Retina) listas para compartir o guardar en la galería sin deformaciones ni esquinas blancas.
 - **🔊 Motor de Audio & Vibración Háptica:** Sintetizador Web Audio API con alertas sonoras para condiciones cumplidas (`HIT!`), fanfarria de victoria y advertencias de peligro en minutos finales (*Clutch*).
-- **🔐 Autenticación Flexible:** Login tradicional con Email y Contraseña, **Google OAuth 2.0** y Modo Invitado con cliente Supabase integrado.
+- **🔐 Autenticación Flexible:** Login y registro con Email y Contraseña, y Modo Invitado con cliente Supabase integrado.
 - **📱 PWA Móvil Instalable:** Soporte completo para instalar como app nativa a pantalla completa en iOS y Android.
 
 ---

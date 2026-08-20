@@ -17,6 +17,8 @@ export interface LiveEventLog {
 interface BetContextType {
   bets: Bet[]
   stats: UserStats
+  initialBankroll: number
+  setInitialBankroll: (amount: number) => void
   filter: string
   setFilter: (f: string) => void
   searchQuery: string
@@ -38,6 +40,7 @@ interface BetContextType {
   updateCondition: (betId: string, conditionId: string, deltaValue: number) => void
   cashoutBet: (betId: string) => void
   settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void
+  setBetStatus: (betId: string, status: Bet['status']) => void
   recalcStats: () => void
 }
 
@@ -46,8 +49,23 @@ const BetContext = createContext<BetContextType | undefined>(undefined)
 const STORAGE_KEY = 'lafija_bets_v1'
 const ODDS_FORMAT_KEY = 'lafija_odds_format_v1'
 const CURRENCY_KEY = 'lafija_currency_v1'
+const INITIAL_BANKROLL_KEY = 'lafija_initial_bankroll_v1'
 
 export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [initialBankroll, setInitialBankrollState] = useState<number>(() => {
+    const saved = localStorage.getItem(INITIAL_BANKROLL_KEY)
+    if (saved) {
+      const parsed = parseFloat(saved)
+      if (!isNaN(parsed) && parsed >= 0) return parsed
+    }
+    return initialStats.initialBankroll
+  })
+
+  const setInitialBankroll = (amount: number) => {
+    setInitialBankrollState(amount)
+    localStorage.setItem(INITIAL_BANKROLL_KEY, String(amount))
+  }
+
   const [currency, setCurrencyState] = useState<'ARS' | 'USD'>(() => {
     const saved = localStorage.getItem(CURRENCY_KEY)
     return saved === 'USD' ? 'USD' : 'ARS'
@@ -69,6 +87,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setOddsFormatState(format)
     localStorage.setItem(ODDS_FORMAT_KEY, format)
   }
+
   const [bets, setBets] = useState<Bet[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (saved) {
@@ -138,7 +157,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     setStats(prev => ({
       ...prev,
-      bankroll: Number((initialStats.initialBankroll + netProfit).toFixed(2)),
+      bankroll: Number((initialBankroll + netProfit).toFixed(2)),
+      initialBankroll,
       totalStaked: Number(totalStaked.toFixed(2)),
       totalWon: Number(totalWon.toFixed(2)),
       netProfit: Number(netProfit.toFixed(2)),
@@ -151,7 +171,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       faceitLevel: level,
       eloRating: elo,
     }))
-  }, [bets])
+  }, [bets, initialBankroll])
 
   useEffect(() => {
     recalcStats()
@@ -166,8 +186,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return prevBets.map(bet => {
           if (bet.status !== 'LIVE') return bet
 
-          // Random minute increment
-          const currentMin = parseInt(bet.match.minute?.replace("'", "") || '50', 10)
+          // Safe minute increment
+          const currentMin = parseInt(bet.match.minute?.replace(/[^0-9]/g, "") || '50', 10) || 50
           const newMin = currentMin < 90 ? currentMin + 1 : 90
 
           // Update conditions randomly
@@ -234,7 +254,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           })
 
           // Check if all conditions are met
-          const allMet = updatedConditions.every(c => c.status === 'MET')
+          const allMet = updatedConditions.length > 0 && updatedConditions.every(c => c.status === 'MET')
           if (allMet && bet.status === 'LIVE') {
             sounds.playWinSound()
             confetti({
@@ -250,9 +270,9 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
           }
 
-          // Dynamic cashout value variation
+          // Dynamic cashout value variation (safe from 0 conditions)
           const metCount = updatedConditions.filter(c => c.status === 'MET').length
-          const ratio = metCount / updatedConditions.length
+          const ratio = updatedConditions.length > 0 ? metCount / updatedConditions.length : 0
           const dynamicCashout = Math.round(bet.stake * (1 + ratio * (bet.odds - 1) * 0.85) * 100) / 100
 
           return {
@@ -349,7 +369,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return cond
       })
 
-      const allMet = newConditions.every(c => c.status === 'MET')
+      const allMet = newConditions.length > 0 && newConditions.every(c => c.status === 'MET')
       if (allMet) {
         sounds.playWinSound()
         confetti({
@@ -361,9 +381,22 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sounds.playHitSound()
       }
 
+      // Recalculate dynamic cashout
+      const metCount = newConditions.filter(c => c.status === 'MET').length
+      const ratio = newConditions.length > 0 ? metCount / newConditions.length : 0
+      const dynamicCashout = Math.round(bet.stake * (1 + ratio * (bet.odds - 1) * 0.85) * 100) / 100
+
+      let nextStatus = bet.status
+      if (allMet) {
+        nextStatus = 'WON'
+      } else if (bet.status === 'WON' && !allMet) {
+        nextStatus = 'LIVE'
+      }
+
       return {
         ...bet,
-        status: allMet ? 'WON' : bet.status,
+        status: nextStatus,
+        cashoutValue: dynamicCashout,
         conditions: newConditions
       }
     }))
@@ -416,11 +449,32 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }))
   }
 
+  const setBetStatus = (betId: string, status: Bet['status']) => {
+    sounds.playClickSound()
+    setBets(prev => prev.map(bet => {
+      if (bet.id === betId) {
+        const isLive = status === 'LIVE'
+        return {
+          ...bet,
+          status,
+          match: {
+            ...bet.match,
+            status: isLive ? 'LIVE' : status === 'PENDING' ? 'SCHEDULED' : 'FINISHED',
+            minute: isLive ? (bet.match.minute || "01'") : bet.match.minute
+          }
+        }
+      }
+      return bet
+    }))
+  }
+
   return (
     <BetContext.Provider
       value={{
         bets,
         stats,
+        initialBankroll,
+        setInitialBankroll,
         filter,
         setFilter,
         searchQuery,
@@ -442,6 +496,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         updateCondition,
         cashoutBet,
         settleBet,
+        setBetStatus,
         recalcStats,
       }}
     >
