@@ -16,9 +16,11 @@ import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
 import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
 import { findFixtureForBet, applyLiveUpdate, needsStats } from '../utils/liveSync';
+import { sanitizeBets, sanitizeNotes } from '../utils/sanitize';
 import {
   fetchLiveFixtures,
   fetchFixtureStats,
+  getLastLiveSource,
   type LiveFixtureStats,
 } from '../services/sportsApi';
 import { useAuth } from './AuthContext';
@@ -129,11 +131,9 @@ function loadInitialBets(): Bet[] {
   const saved = readLocalStorage(STORAGE_KEY);
   if (saved) {
     try {
-      const parsed = JSON.parse(saved) as Bet[];
-      // Purga de datos demo heredados de versiones con mocks
-      return Array.isArray(parsed)
-        ? parsed.filter((b) => !LEGACY_MOCK_BET_IDS.has(b.id))
-        : [];
+      const parsed: unknown = JSON.parse(saved);
+      // Sanitiza shape + purga de datos demo heredados de versiones con mocks
+      return sanitizeBets(parsed).filter((b) => !LEGACY_MOCK_BET_IDS.has(b.id));
     } catch {
       return [];
     }
@@ -281,7 +281,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     let notes: Note[] = [];
     try {
       const saved = localStorage.getItem('lafija_notes_v1');
-      if (saved) notes = JSON.parse(saved) as Note[];
+      if (saved) notes = sanitizeNotes(JSON.parse(saved) as unknown);
     } catch {
       // notas ilegibles: se exportan vacías
     }
@@ -369,6 +369,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
   const realSyncingRef = useRef(false);
   // Última vez que se pidieron stats por fixture (cadencia STATS_TTL_MS)
   const statsFetchedAtRef = useRef<Map<string, number>>(new Map());
+  // Polls consecutivos servidos por API-Football (para backoff de cuota)
+  const apifootballStreakRef = useRef(0);
 
   const syncLiveData = useCallback(async () => {
     if (realSyncingRef.current) return;
@@ -451,13 +453,25 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
 
   useEffect(() => {
     if (!isRealMode) return;
-    // Primer sync diferido para no hacer setState en el cuerpo del efecto
-    const initial = setTimeout(() => void syncLiveData(), 0);
-    const interval = setInterval(() => void syncLiveData(), REAL_SYNC_INTERVAL_MS);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
+    // Auto-agendado con backoff: si la cascada cae a API-Football (consume
+    // cuota), cada poll espacia el doble hasta un maximo de 10 minutos.
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      await syncLiveData();
+      let ms = REAL_SYNC_INTERVAL_MS;
+      if (getLastLiveSource() === 'apifootball') {
+        apifootballStreakRef.current += 1;
+        ms = Math.min(
+          REAL_SYNC_INTERVAL_MS * 2 ** Math.min(apifootballStreakRef.current - 1, 4),
+          10 * 60_000,
+        );
+      } else {
+        apifootballStreakRef.current = 0;
+      }
+      timer = setTimeout(() => void tick(), ms);
     };
+    timer = setTimeout(() => void tick(), 0);
+    return () => clearTimeout(timer);
   }, [isRealMode, syncLiveData]);
 
   const toggleRealMode = () =>

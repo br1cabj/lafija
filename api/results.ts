@@ -541,6 +541,19 @@ async function handleApiFootballStats(
   });
 }
 
+/** Ejecuta un handler de stats garantizando siempre forma {stats:...}. */
+async function runStats(
+  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  run: () => Promise<void>,
+): Promise<void> {
+  try {
+    await run();
+  } catch (err) {
+    console.warn('[api/results] stats fallo:', err);
+    sendJson(res, 200, { stats: null });
+  }
+}
+
 function sendJson(
   res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
   status: number,
@@ -548,7 +561,9 @@ function sendJson(
 ): void {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'public, max-age=30');
+  // s-maxage: el edge de Vercel cachea y sirve repetidas sin invocar la
+  // funcion -> protege la cuota de API-Football del polling del cliente
+  res.setHeader('Cache-Control', 'public, s-maxage=45, stale-while-revalidate=60');
   res.end(JSON.stringify(body));
 }
 
@@ -575,9 +590,9 @@ export default async function handler(
           sendJson(res, 400, { error: 'Query param "stats" invalido' });
           return;
         }
-        await handleApiFootballStats(res, fixtureId);
+        await runStats(res, () => handleApiFootballStats(res, fixtureId));
       } else if (rawId.startsWith('ss-')) {
-        await handleSportScoreStats(res, rawId.slice(3));
+        await runStats(res, () => handleSportScoreStats(res, rawId.slice(3)));
       } else {
         // ESPN u otra fuente sin endpoint de stats
         sendJson(res, 200, { stats: null });

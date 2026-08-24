@@ -51,6 +51,12 @@ export interface TeamSuggestion {
 }
 
 let apiAvailable: boolean | null = null;
+let lastSource = 'none';
+
+/** Fuente usada por el último fetchLiveFixtures ('espn'|'sportscore'|'apifootball'|'none'). */
+export function getLastLiveSource(): string {
+  return lastSource;
+}
 
 /** Ping único al proxy para saber si hay datos reales disponibles. */
 export async function probeLiveApi(): Promise<boolean> {
@@ -91,9 +97,13 @@ interface ResultsResponse {
 export async function fetchLiveFixtures(): Promise<LiveFixture[]> {
   try {
     const res = await fetch('/api/results?all=1');
-    if (!res.ok) return [];
+    if (!res.ok) {
+      lastSource = 'none';
+      return [];
+    }
     const json = (await res.json()) as ResultsResponse;
     const source = json.source ?? 'none';
+    lastSource = source;
     return (json.results ?? []).map((r) => ({
       fixtureId: numericId(r.id),
       // ESPN no publica stats granulares de futbol: solo af- y ss- piden stats
@@ -112,6 +122,7 @@ export async function fetchLiveFixtures(): Promise<LiveFixture[]> {
       startTime: '',
     }));
   } catch (err) {
+    lastSource = 'none';
     console.warn('No se pudieron obtener partidos en vivo:', err);
     return [];
   }
@@ -144,18 +155,55 @@ export async function fetchFixtureStats(
   }
 }
 
-/** Autocomplete de equipos por nombre (SofaScore gratis, fallback con cuota). */
+const TEAM_CACHE_KEY = 'lafija_team_search_cache_v1';
+const TEAM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Caché de sesión para búsquedas de equipos: tipear prefijos repetidos
+ * ("riv", "rive", "river") no vuelve a golpear el server (y su cuota). */
+function readTeamCache(term: string): TeamSuggestion[] | null {
+  try {
+    const raw = sessionStorage.getItem(TEAM_CACHE_KEY);
+    if (!raw) return null;
+    const map = JSON.parse(raw) as Record<string, { ts: number; teams: TeamSuggestion[] }>;
+    const hit = map[term];
+    if (!hit || Date.now() - hit.ts > TEAM_CACHE_TTL_MS) return null;
+    return hit.teams;
+  } catch {
+    return null;
+  }
+}
+
+function writeTeamCache(term: string, teams: TeamSuggestion[]): void {
+  try {
+    const raw = sessionStorage.getItem(TEAM_CACHE_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, { ts: number; teams: TeamSuggestion[] }>) : {};
+    // Cap duro: maximo 40 terminos cacheados
+    const entries = Object.entries(map);
+    if (entries.length >= 40) entries.sort((a, b) => a[1].ts - b[1].ts).slice(0, entries.length - 39).forEach(([k]) => delete map[k]);
+    map[term] = { ts: Date.now(), teams };
+    sessionStorage.setItem(TEAM_CACHE_KEY, JSON.stringify(map));
+  } catch {
+    /* storage lleno o bloqueado: sin cache no pasa nada */
+  }
+}
+
+/** Autocomplete de equipos por nombre (con caché de sesión). */
 export async function fetchTeamSuggestions(
   term: string,
 ): Promise<TeamSuggestion[]> {
-  if (term.trim().length < 3) return [];
+  const clean = term.trim();
+  if (clean.length < 3) return [];
+
+  const cached = readTeamCache(clean);
+  if (cached) return cached;
+
   try {
-    const res = await fetch(
-      `/api/sports?teamsSearch=${encodeURIComponent(term.trim())}`,
-    );
+    const res = await fetch(`/api/sports?teamsSearch=${encodeURIComponent(clean)}`);
     if (!res.ok) return [];
     const json = (await res.json()) as { teams?: TeamSuggestion[] };
-    return json.teams ?? [];
+    const teams = json.teams ?? [];
+    writeTeamCache(clean, teams);
+    return teams;
   } catch {
     return [];
   }

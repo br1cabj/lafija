@@ -1,4 +1,5 @@
 import type { Bet } from '../types/bet';
+import { sanitizeBets } from '../utils/sanitize';
 import { supabase } from './supabase';
 
 /**
@@ -17,7 +18,8 @@ export async function fetchRemoteBets(userId: string): Promise<Bet[]> {
   if (error) {
     throw new Error(`Error al descargar apuestas: ${error.message}`);
   }
-  return (data ?? []).map((row: { data: Bet }) => row.data);
+  // jsonb puede contener shapes viejos o corruptos: nunca se confía en ellos
+  return sanitizeBets((data ?? []).map((row: { data: unknown }) => row.data));
 }
 
 export async function syncBetsToCloud(

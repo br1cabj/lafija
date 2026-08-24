@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Note, NoteDraft } from '../types/note';
+import { sanitizeNotes } from '../utils/sanitize';
 import { useAuth } from './AuthContext';
 import { canSyncToCloud } from '../services/supabase';
 import { fetchRemoteNotes, syncNotesToCloud } from '../services/notesRepo';
@@ -27,8 +28,7 @@ function readStoredNotes(): Note[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return [];
-    const parsed = JSON.parse(saved) as Note[];
-    return Array.isArray(parsed) ? parsed : [];
+    return sanitizeNotes(JSON.parse(saved) as unknown);
   } catch {
     return [];
   }

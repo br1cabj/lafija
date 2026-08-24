@@ -127,7 +127,10 @@ export function formatConditionValue(cond: BetCondition): string {
  * - Si todas se anulan: 1.0 (reembolso del stake).
  */
 export function effectiveOdds(bet: Bet): number {
-  const withOdds = bet.conditions.filter((c) => typeof c.odds === 'number');
+  // Cuotas no positivas (0, NaN cargado como string, etc.) se tratan como ausentes
+  const withOdds = bet.conditions.filter(
+    (c) => typeof c.odds === 'number' && c.odds > 0,
+  );
   if (withOdds.length === 0) return bet.odds;
 
   const active = withOdds.filter((c) => c.status !== 'VOID');

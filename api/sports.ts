@@ -88,54 +88,14 @@ interface TeamSuggestionRow {
   country: string;
 }
 
-/** Búsqueda de equipos en SofaScore (gratuita). */
-async function searchSofaTeams(term: string): Promise<TeamSuggestionRow[]> {
-  const res = await fetch(
-    `https://api.sofascore.com/api/v1/search/team/all?q=${encodeURIComponent(term)}&page=0`,
-    { headers: { 'User-Agent': 'lafija/1.0' } },
-  );
-  if (!res.ok) throw new Error(`SofaScore HTTP ${res.status}`);
-  const json = (await res.json()) as {
-    results?: Array<{
-      entity?: {
-        id?: number;
-        name?: string;
-        country?: { name?: string };
-        sport?: { slug?: string };
-      };
-    }>;
-  };
-
-  return (json.results ?? [])
-    .map((r) => r.entity)
-    .filter(
-      (
-        e,
-      ): e is {
-        id: number;
-        name: string;
-        country?: { name?: string };
-        sport?: { slug?: string };
-      } =>
-        typeof e?.id === 'number' &&
-        typeof e?.name === 'string' &&
-        (!e.sport?.slug || e.sport.slug === 'football'),
-    )
-    .slice(0, 8)
-    .map((e) => ({
-      id: e.id,
-      name: e.name,
-      country: e.country?.name ?? '',
-    }));
-}
-
-/** Búsqueda de equipos en API-Football (fallback con guardián de cuota). */
+/** Búsqueda de equipos en API-Football (con guardián de cuota). */
 async function searchApiFootballTeams(
   term: string,
 ): Promise<TeamSuggestionRow[]> {
+  // TTL de 7 días: los nombres de equipos no cambian
   const json = (await cachedUpstreamFetch(
     `/teams?search=${encodeURIComponent(term)}`,
-    24 * 60 * 60 * 1000,
+    7 * 24 * 60 * 60 * 1000,
   )) as {
     response?: Array<{
       team?: { id?: number; name?: string; country?: string };
@@ -152,22 +112,11 @@ async function searchApiFootballTeams(
     }));
 }
 
-/** Autocomplete de equipos: SofaScore primero, API-Football como fallback. */
+/** Autocomplete de equipos. */
 async function handleTeamsSearch(
   res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
   search: string,
 ): Promise<void> {
-  try {
-    const teams = await searchSofaTeams(search);
-    if (teams.length > 0) {
-      sendJson(res, 200, { teams, source: 'sofascore' });
-      return;
-    }
-  } catch (err) {
-    console.warn('[api/sports] búsqueda SofaScore fallo:', err);
-  }
-
-  // Fallback a API-Football (cachedUpstreamFetch aplica el guardián de cuota)
   const teams = await searchApiFootballTeams(search);
   sendJson(res, 200, { teams, source: 'apifootball' });
 }
@@ -179,6 +128,8 @@ function sendJson(
 ): void {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
+  // Edge cache: repetidas no invocan la funcion (protege la cuota)
+  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   res.end(JSON.stringify(body));
 }
 
