@@ -37,8 +37,7 @@ export const LiveFeedSidebar: React.FC = () => {
         <div className='space-y-2.5 max-h-96 overflow-y-auto pr-1'>
           {liveLogs.length === 0 ? (
             <p className='text-xs text-slate-500 text-center py-6'>
-              Sin eventos recientes. Activa el simulador para ver actividad en
-              vivo.
+              Sin eventos. Activa el simulador o el modo de datos reales.
             </p>
           ) : (
             liveLogs.map((log) => {

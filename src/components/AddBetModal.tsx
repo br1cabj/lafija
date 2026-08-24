@@ -159,9 +159,9 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const getOddsPlaceholder = () => {
     switch (inputOddsFormat) {
       case 'american':
-        return '+150 o -110';
+        return '+150';
       case 'fractional':
-        return '3/2 o 5/4';
+        return '3/2';
       case 'implied':
         return '40%';
       case 'decimal':
@@ -237,7 +237,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             Registrar Nueva Apuesta
           </h2>
           <p className='text-xs text-slate-400'>
-            Configura los mercados, cuotas en cualquier formato y condiciones
+            Mercados, cuotas y condiciones del tracker
           </p>
         </div>
       </div>
@@ -331,7 +331,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               type='text'
               value={league}
               onChange={(e) => setLeague(e.target.value)}
-              placeholder='ej. Champions League, NBA'
+              placeholder='Liga'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -352,7 +352,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               required
               value={homeTeam}
               onChange={(e) => setHomeTeam(e.target.value)}
-              placeholder='ej. Barcelona, Lakers, Alcaraz'
+              placeholder='Equipo local'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -370,7 +370,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               required
               value={awayTeam}
               onChange={(e) => setAwayTeam(e.target.value)}
-              placeholder='ej. PSG, Warriors, Sinner'
+              placeholder='Equipo visitante'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -502,7 +502,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 required
                 value={bookmaker}
                 onChange={(e) => setBookmaker(e.target.value)}
-                placeholder='ej. Betsson, Stake, 1xBet...'
+                placeholder='Casa de apuestas'
                 className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-sm text-white focus:border-brand focus:outline-none'
               />
             </div>
@@ -637,7 +637,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               <input
                 type='text'
                 aria-label={`Mercado condición ${idx + 1}`}
-                placeholder='Mercado (ej. Córners)'
+                placeholder='Mercado'
                 value={c.market}
                 onChange={(e) =>
                   handleConditionChange(idx, 'market', e.target.value)
@@ -648,7 +648,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               <input
                 type='text'
                 aria-label={`Selección condición ${idx + 1}`}
-                placeholder='Selección (ej. +8.5 Córners)'
+                placeholder='Selección'
                 value={c.selection}
                 onChange={(e) =>
                   handleConditionChange(idx, 'selection', e.target.value)
@@ -723,7 +723,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             className='px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none'
           >
             <Zap className='w-4 h-4 fill-white' />
-            <span>Guardar & Iniciar Tracker</span>
+            <span>Guardar Apuesta</span>
           </button>
         </div>
       </form>

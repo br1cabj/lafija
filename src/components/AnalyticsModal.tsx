@@ -172,10 +172,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
         {sportBreakdown.length === 0 ? (
           <div className='p-6 bg-base border border-dashed border-white/10 rounded text-center'>
             <p className='text-xs text-slate-400'>
-              Aún no hay apuestas registradas para analizar.
-            </p>
-            <p className='text-[11px] text-slate-500 mt-1'>
-              Registra tu primera apuesta para ver el desglose por deporte.
+              Registra apuestas para ver el desglose por deporte.
             </p>
           </div>
         ) : (

@@ -61,7 +61,7 @@ export const AuthModal: React.FC = () => {
           {mode === 'LOGIN' ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
         </h2>
         <p className='text-xs text-slate-400 mt-0.5'>
-          Accede a tu historial, cuotas y bankroll sincronizado
+          Tu historial y bankroll, sincronizados
         </p>
       </div>
 

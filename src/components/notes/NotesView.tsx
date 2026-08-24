@@ -55,7 +55,7 @@ export const NotesView: React.FC = () => {
             aria-label='Buscar notas'
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder='Buscar en tus notas...'
+            placeholder='Buscar notas...'
             className='w-full bg-surface border border-white/5 focus:border-brand pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-slate-500 focus:outline-none'
           />
         </div>
@@ -86,8 +86,7 @@ export const NotesView: React.FC = () => {
             Tu diario está vacío
           </h3>
           <p className='text-xs text-slate-400 mb-3 max-w-xs mx-auto'>
-            Anota estrategias, reflexiones post-partido o lecciones aprendidas
-            para mejorar como tipster.
+            Estrategias, reflexiones y lecciones para mejorar como tipster.
           </p>
           <button
             onClick={() => setEditorState({ isOpen: true, note: null })}

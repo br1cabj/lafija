@@ -49,7 +49,7 @@ export const FilterBar: React.FC = () => {
           aria-label='Buscar partido o condición'
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder='Buscar partido o condición...'
+          placeholder='Buscar apuestas...'
           className='w-full bg-surface border border-white/5 focus:border-brand pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-slate-500 focus:outline-none'
         />
         {searchQuery && (

@@ -72,8 +72,7 @@ export const PWAInstallBanner: React.FC = () => {
               Instalar La Fija en tu Móvil (PWA)
             </p>
             <p className='text-[11px] text-slate-400 hidden sm:block'>
-              Accede rápido como app nativa, con seguimiento offline y alertas
-              en tiempo real.
+              Rápido como app nativa, con seguimiento offline.
             </p>
           </div>
         </div>

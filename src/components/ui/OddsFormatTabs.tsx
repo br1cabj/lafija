@@ -8,10 +8,10 @@ const FORMATS: {
   full: string;
   hideClass?: string;
 }[] = [
-  { value: 'decimal', short: 'DEC', full: 'Decimal (2.50)' },
-  { value: 'american', short: 'AME', full: 'Americana (+150)' },
-  { value: 'fractional', short: 'FRA', full: 'Fraccional (3/2)', hideClass: 'hidden sm:block' },
-  { value: 'implied', short: 'IMP', full: 'Prob % (40%)', hideClass: 'hidden md:block' },
+  { value: 'decimal', short: 'DEC', full: 'Decimal' },
+  { value: 'american', short: 'AME', full: 'Americana' },
+  { value: 'fractional', short: 'FRA', full: 'Fraccional', hideClass: 'hidden sm:block' },
+  { value: 'implied', short: 'IMP', full: 'Prob %', hideClass: 'hidden md:block' },
 ];
 
 interface OddsFormatTabsProps {
