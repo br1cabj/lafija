@@ -83,6 +83,50 @@ export function findFixtureForBet(
   );
 }
 
+/**
+ * Vínculo partido<->pata para builders de más de un partido.
+ * `primary` es el partido principal de la apuesta (cabecera de la tarjeta);
+ * `byCondition` asigna cada pata al partido que menciona en su texto:
+ * si una pata nombra al equipo de otro partido del boleto, trackea ese.
+ */
+export interface BetFixtureLinks {
+  primary: LiveFixture | null;
+  byCondition: Map<string, LiveFixture>;
+}
+
+/**
+ * Resuelve el partido de cada pata. Las patas genéricas ("Más de 4.5
+ * córners") heredan el partido principal; las que mencionan otro equipo
+ * del boleto se vinculan a su propio partido.
+ */
+export function findFixturesForBet(
+  bet: Bet,
+  fixtures: LiveFixture[],
+): BetFixtureLinks {
+  const primary = findFixtureForBet(bet, fixtures);
+  const byCondition = new Map<string, LiveFixture>();
+  for (const cond of bet.conditions) {
+    const text = `${cond.market} ${cond.selection}`;
+    const mentioned = fixtures.find(
+      (f) => namesMatch(f.homeTeam, text) || namesMatch(f.awayTeam, text),
+    );
+    if (mentioned && mentioned !== primary) byCondition.set(cond.id, mentioned);
+  }
+  return { primary, byCondition };
+}
+
+/** Partidos únicos vinculados a la apuesta (el principal primero). */
+export function linkedFixturesOf(links: BetFixtureLinks): LiveFixture[] {
+  const seen = new Set<number>();
+  const out: LiveFixture[] = [];
+  for (const f of [links.primary, ...links.byCondition.values()]) {
+    if (!f?.fixtureId || seen.has(f.fixtureId)) continue;
+    seen.add(f.fixtureId);
+    out.push(f);
+  }
+  return out;
+}
+
 const totalGoals = (fixture: LiveFixture): number =>
   fixture.homeScore + fixture.awayScore;
 
@@ -240,35 +284,46 @@ export interface LiveSyncResult {
 }
 
 /**
- * true si la apuesta tiene condiciones que dependen de estadísticas
- * granulares (córners/tarjetas/remates/faltas) y por lo tanto justifica
- * pedir el endpoint de stats. Las de goles se resuelven con el marcador.
+ * true si la condición depende de estadísticas granulares (córners,
+ * tarjetas, remates, faltas). Las de goles se resuelven con el marcador.
  */
+export function conditionNeedsStats(cond: BetCondition): boolean {
+  const text = normalizeName(`${cond.market} ${cond.selection}`);
+  return /corner|tarjeta|card|tiro|remate|shot|falta|foul/.test(text);
+}
+
+/** true si alguna pata de la apuesta necesita el endpoint de stats. */
 export function needsStats(bet: Bet): boolean {
-  return bet.conditions.some((c) => {
-    const text = normalizeName(`${c.market} ${c.selection}`);
-    return /corner|tarjeta|card|tiro|remate|shot|falta|foul/.test(text);
-  });
+  return bet.conditions.some(conditionNeedsStats);
 }
 
 /**
- * Aplica los datos reales del partido a una apuesta LIVE.
- * Función pura: no auto-asienta la apuesta (WON/LOST sigue siendo manual);
- * solo actualiza marcador, minuto y valores/estado de las condiciones.
+ * Aplica los datos reales a una apuesta LIVE, con soporte multi-partido:
+ * cada pata usa su propio partido (y sus stats); las genéricas usan el
+ * principal. Función pura: no auto-asienta la apuesta (WON/LOST sigue
+ * siendo manual); solo actualiza marcador, minuto y valores/estados.
  */
 export function applyLiveUpdate(
   bet: Bet,
-  fixture: LiveFixture,
-  stats: LiveFixtureStats | null,
+  links: BetFixtureLinks,
+  statsByRef: Map<string, LiveFixtureStats | null>,
 ): LiveSyncResult {
   if (bet.status !== 'LIVE') return { bet, newHits: [] };
+  const primary = links.primary;
+  if (!primary) return { bet, newHits: [] };
 
   const newHits: string[] = [];
-  const minuteNum = parseInt(fixture.minute.replace(/[^0-9]/g, ''), 10) || 0;
+  const minuteNum =
+    parseInt(primary.minute.replace(/[^0-9]/g, ''), 10) || 0;
 
   const newConditions = bet.conditions.map((cond): BetCondition => {
     // Anuladas por suspensión: quedan congeladas (aportan cuota 1.0)
     if (cond.status === 'VOID') return cond;
+    // La pata puede pertenecer a OTRO partido del builder
+    const fixture = links.byCondition.get(cond.id) ?? primary;
+    const stats = fixture.statsRef
+      ? (statsByRef.get(fixture.statsRef) ?? null)
+      : null;
     const value = statForCondition(cond, fixture, stats);
     if (value === null || !isNumericCondition(cond)) return cond;
     if (value <= cond.currentValue) return cond;
@@ -292,7 +347,7 @@ export function applyLiveUpdate(
   return {
     bet: {
       ...bet,
-      match: mapMatchInfo(fixture, bet.match),
+      match: mapMatchInfo(primary, bet.match),
       cashoutValue: computeCashout(bet, newConditions),
       conditions: newConditions,
     },

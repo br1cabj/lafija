@@ -15,7 +15,12 @@ import type { OddsFormat } from '../utils/odds';
 import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
 import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
-import { findFixtureForBet, applyLiveUpdate, needsStats } from '../utils/liveSync';
+import {
+  findFixturesForBet,
+  linkedFixturesOf,
+  applyLiveUpdate,
+  conditionNeedsStats,
+} from '../utils/liveSync';
 import { sanitizeBets, sanitizeNotes } from '../utils/sanitize';
 import {
   fetchLiveFixtures,
@@ -392,28 +397,36 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       const linkedFlags = new Map<string, boolean>();
 
       for (const bet of liveBets) {
-        const fixture = findFixtureForBet(bet, fixtures);
+        const links = findFixturesForBet(bet, fixtures);
         // Flag para el aviso de "seguimiento manual" en la tarjeta
-        linkedFlags.set(bet.id, Boolean(fixture?.fixtureId));
-        if (!fixture || !fixture.fixtureId) continue;
+        linkedFlags.set(bet.id, Boolean(links.primary?.fixtureId));
+        if (!links.primary?.fixtureId) continue;
 
-        // Stats solo si hay condiciones que las necesitan (córners, tarjetas,
-        // remates, faltas) y como máximo cada 3 min por partido: cambian lento.
-        let stats: LiveFixtureStats | null = null;
-        if (fixture.statsRef && needsStats(bet)) {
-          const last = statsFetchedAtRef.current.get(fixture.statsRef) ?? 0;
+        // Stats por cada partido DISTINTO del builder (multi-partido): solo
+        // si alguna pata de ese partido las necesita y como máximo cada
+        // 3 min por partido: cambian lento.
+        const statsByRef = new Map<string, LiveFixtureStats | null>();
+        for (const fx of linkedFixturesOf(links)) {
+          if (!fx.statsRef) continue;
+          const condsOfFx = bet.conditions.filter(
+            (c) =>
+              (links.byCondition.get(c.id) ?? links.primary)?.fixtureId ===
+              fx.fixtureId,
+          );
+          if (!condsOfFx.some(conditionNeedsStats)) continue;
+          const last = statsFetchedAtRef.current.get(fx.statsRef) ?? 0;
           if (Date.now() - last >= STATS_TTL_MS) {
-            stats = await fetchFixtureStats(fixture);
-            statsFetchedAtRef.current.set(fixture.statsRef, Date.now());
+            statsByRef.set(fx.statsRef, await fetchFixtureStats(fx));
+            statsFetchedAtRef.current.set(fx.statsRef, Date.now());
           }
         }
 
-        const result = applyLiveUpdate(bet, fixture, stats);
+        const result = applyLiveUpdate(bet, links, statsByRef);
         if (result.bet !== bet) {
           updates.push({
             bet: result.bet,
             hits: result.newHits,
-            title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
+            title: `${links.primary.homeTeam} vs ${links.primary.awayTeam}`,
           });
         }
       }

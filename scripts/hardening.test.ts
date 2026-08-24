@@ -10,7 +10,9 @@ import {
   applyLiveUpdate,
   detectApiCategory,
   findFixtureForBet,
+  findFixturesForBet,
   isAutoTrackable,
+  linkedFixturesOf,
   namesMatch,
   needsStats,
   normalizeName,
@@ -113,6 +115,20 @@ function fixture(partial: Partial<LiveFixture>): LiveFixture {
     ...partial,
   };
 }
+
+// Helper: aplica update de un solo partido con la firma multi-partido
+const upd = (
+  b: ReturnType<typeof bet>,
+  f: LiveFixture,
+  s: LiveFixtureStats | null,
+) => {
+  const fx = s && !f.statsRef ? { ...f, statsRef: 'af-test' } : f;
+  return applyLiveUpdate(
+    b,
+    { primary: fx, byCondition: new Map() },
+    new Map(fx.statsRef ? [[fx.statsRef as string, s]] : []),
+  );
+};
 
 // ---- 1. effectiveOdds (lógica financiera) -----------------------------------
 
@@ -400,7 +416,7 @@ console.log('\n[6] applyLiveUpdate');
 
 test('apuesta no LIVE queda intacta', () => {
   const b = bet({ status: 'PENDING' });
-  const r = applyLiveUpdate(b, fixture({ homeScore: 5, awayScore: 4 }), null);
+  const r = upd(b, fixture({ homeScore: 5, awayScore: 4 }), null);
   assert(r.bet === b, 'no debe tocar la apuesta');
   assert(r.newHits.length === 0, 'sin hits');
 });
@@ -412,7 +428,7 @@ test('condición de goles se marca con el marcador', () => {
       cond({ id: 'g', market: 'Goles Totales', selection: 'Más de 2.5 goles', targetValue: 3, currentValue: 1 }),
     ],
   });
-  const r = applyLiveUpdate(b, fixture({ homeScore: 2, awayScore: 1 }), null);
+  const r = upd(b, fixture({ homeScore: 2, awayScore: 1 }), null);
   assert(r.bet.conditions[0].status === 'MET', 'debe pasar a MET');
   assert(r.bet.conditions[0].currentValue === 3, 'currentValue = total goles');
   assert(r.newHits.includes('Más de 2.5 goles'), 'debe registrar hit');
@@ -425,7 +441,7 @@ test('stats null: condición de córners NO avanza ni se inventa cero', () => {
       cond({ id: 'c', market: 'Córners', selection: 'Más de 8.5 córners', targetValue: 9, currentValue: 4 }),
     ],
   });
-  const r = applyLiveUpdate(b, fixture(), null);
+  const r = upd(b, fixture(), null);
   assert(r.bet.conditions[0].currentValue === 4, 'valor congelado');
   assert(r.newHits.length === 0, 'sin hits');
 });
@@ -437,7 +453,7 @@ test('condiciones VOID quedan congeladas aunque haya datos', () => {
     fixtureId: 1, homeTeam: '', awayTeam: '',
     corners: { home: 6, away: 3, total: 9 },
   };
-  const r = applyLiveUpdate(b, fixture(), full);
+  const r = upd(b, fixture(), full);
   assert(r.bet.conditions[0].currentValue === 1, 'VOID no cambia');
   assert(r.newHits.length === 0, 'sin hits en VOID');
 });
@@ -450,14 +466,71 @@ test('regresión del valor real no rebaja el progreso ya logrado', () => {
     ],
   });
   // El feed retrocede el marcador a 0-0 (glitch de proveedor)
-  const r = applyLiveUpdate(b, fixture({ homeScore: 0, awayScore: 0 }), null);
+  const r = upd(b, fixture({ homeScore: 0, awayScore: 0 }), null);
   assert(r.bet.conditions[0].currentValue === 2, 'no debe rebajar');
 });
 
 test('POSTPONED del feed llega al matchInfo', () => {
   const b = bet({ status: 'LIVE' });
-  const r = applyLiveUpdate(b, fixture({ statusShort: 'POSTPONED' }), null);
+  const r = upd(b, fixture({ statusShort: 'POSTPONED' }), null);
   assert(r.bet.match.status === 'POSTPONED', `esperaba POSTPONED, dio ${r.bet.match.status}`);
+});
+
+// ---- 6b. builder multi-partido -------------------------------------------------
+
+console.log('\n[6b] builder multi-partido');
+
+const fA = fixture({ homeScore: 0, awayScore: 0 });
+const fB = fixture({
+  fixtureId: 2,
+  statsRef: 'af-2',
+  homeTeam: 'Flamengo',
+  awayTeam: 'Palmeiras',
+});
+
+test('patas genericas heredan el partido principal', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [cond({ id: 'g', market: 'Córners', selection: 'Más de 8.5 córners' })],
+  });
+  const links = findFixturesForBet(b, [fA, fB]);
+  assert(links.primary === fA, 'primary = partido de la apuesta');
+  assert(!links.byCondition.has('g'), 'pata generica no menciona otro equipo');
+  assert(linkedFixturesOf(links).length === 1, 'un solo partido vinculado');
+});
+
+test('pata que menciona al otro partido trackea su propio fixture', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'a', market: 'Córners', selection: 'Más de 8.5 córners' }),
+      cond({ id: 'b', market: 'Tarjetas', selection: 'Más de 3.5 tarjetas - Flamengo' }),
+    ],
+  });
+  const links = findFixturesForBet(b, [fA, fB]);
+  assert(links.byCondition.get('b') === fB, 'pata Flamengo -> fixture Flamengo');
+  assert(!links.byCondition.has('a'), 'pata generica sigue en el principal');
+  assert(linkedFixturesOf(links).length === 2, 'dos partidos vinculados');
+});
+
+test('applyLiveUpdate evalua cada pata con SU propio marcador', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'x', market: 'Goles Totales', selection: 'Más de 0.5 goles Flamengo', targetValue: 1 }),
+      cond({ id: 'y', market: 'Goles Totales', selection: 'Más de 0.5 goles', targetValue: 1 }),
+    ],
+  });
+  // Primary 0-0; el partido de Flamengo ya va 2-0
+  const r = applyLiveUpdate(
+    b,
+    findFixturesForBet(b, [fA, fB]),
+    new Map([['af-2', null]]),
+  );
+  const x = r.bet.conditions.find((c) => c.id === 'x');
+  const y = r.bet.conditions.find((c) => c.id === 'y');
+  assert(x?.status === 'MET', `Flamengo 2 goles debe ser MET, dio ${x?.status}`);
+  assert(y?.status !== 'MET', 'primary 0-0 no debe marcar');
 });
 
 // ---- 7. cashout y deltas manuales ---------------------------------------------
@@ -659,7 +732,7 @@ test('shots ausente en stats -> null (sin inventar)', () => {
     fixtureId: 1, homeTeam: '', awayTeam: '',
     shotsOnTarget: { home: 1, away: 1, total: 2 },
   };
-  const r = applyLiveUpdate(b, fixture(), partial);
+  const r = upd(b, fixture(), partial);
   assert(r.bet.conditions[0].currentValue === 10, 'congelado sin shots');
 });
 
