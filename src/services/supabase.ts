@@ -9,3 +9,8 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+/** true si hay sesión de Supabase disponible para sincronizar datos. */
+export function canSyncToCloud(): boolean {
+  return isSupabaseConfigured && supabase !== null;
+}

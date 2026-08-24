@@ -79,12 +79,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.faceit-card {
+.panel-card {
   background: linear-gradient(180deg, #161822 0%, #11131a 100%);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.faceit-card:hover {
+.panel-card:hover {
   border-color: rgba(255, 255, 255, 0.14);
 }
 

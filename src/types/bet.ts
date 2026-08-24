@@ -80,7 +80,7 @@ export interface UserStats {
   liveBets: number;
   clutchBets: number;
   winStreak: number;
-  faceitLevel: number; // 1 to 10
+  rankLevel: number; // 1 to 10
   eloRating: number;
 }
 

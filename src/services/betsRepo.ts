@@ -1,15 +1,11 @@
 import type { Bet } from '../types/bet';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase } from './supabase';
 
 /**
  * Persistencia de apuestas en Supabase (tabla `bets`, ver supabase/schema.sql).
  * Cada fila guarda la apuesta completa como jsonb; RLS limita el acceso
  * al propietario de la sesión.
  */
-
-export function canSyncToCloud(): boolean {
-  return isSupabaseConfigured && supabase !== null;
-}
 
 export async function fetchRemoteBets(userId: string): Promise<Bet[]> {
   if (!supabase) return [];

@@ -33,7 +33,7 @@ export function computeUserStats(
     b.conditions.some((c) => c.status === 'CLUTCH_DANGER'),
   ).length;
 
-  // Faceit-style rating derived from win rate & profit
+  // Rating estilo ELO derivado del win rate y el beneficio neto
   const elo = Math.round(1500 + winRate * 5 + netProfit * 0.4);
   const level = Math.min(10, Math.max(1, Math.floor(elo / 200)));
 
@@ -52,7 +52,7 @@ export function computeUserStats(
     liveBets: liveBets.length,
     clutchBets,
     winStreak: wonBets.length > 0 ? Math.min(wonBets.length, 5) : 0,
-    faceitLevel: level,
+    rankLevel: level,
     eloRating: elo,
   };
 }

@@ -92,7 +92,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-label={ariaLabel}
         tabIndex={-1}
         className={clsx(
-          'faceit-card border border-white/15 w-full rounded-lg shadow-2xl p-5 md:p-6 my-4 sm:my-8 text-slate-200 outline-none',
+          'panel-card border border-white/15 w-full rounded-lg shadow-2xl p-5 md:p-6 my-4 sm:my-8 text-slate-200 outline-none',
           maxWidthClass,
           panelClassName,
         )}

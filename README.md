@@ -2,13 +2,13 @@
 
 ![LA FIJA](https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=1200&auto=format&fit=crop&q=80)
 
-> **LA FIJA** es una aplicación web progresiva (PWA) de seguimiento de apuestas deportivas en vivo con estética **FACEIT (Dark Esports)**. Permite desglosar apuestas simples, combinadas y *Bet Builders* condición por condición (córners, remates al arco, goles, tarjetas) con cálculo dinámico de Cashout, soporte multiformato de cuotas y exportación de boletos oficiales en alta resolución para redes sociales.
+> **LA FIJA** es una aplicación web progresiva (PWA) de seguimiento de apuestas deportivas en vivo con estética **dark esports**. Permite desglosar apuestas simples, combinadas y *Bet Builders* condición por condición (córners, remates al arco, goles, tarjetas) con cálculo dinámico de Cashout, soporte multiformato de cuotas y exportación de boletos oficiales en alta resolución para redes sociales.
 
 ---
 
 ## 🚀 Características Principales
 
-- **🎮 Estética Esports / FACEIT:** Tema oscuro de alto contraste (`#0E1017` + `#FF5500`), tipografías tabulares legibles y HUD de estadísticas.
+- **🎮 Estética Dark Esports:** Tema oscuro de alto contraste (`#0E1017` + `#FF5500`), tipografías tabulares legibles y HUD de estadísticas.
 - **📋 Live Condition Breaker:** Seguimiento tramo a tramo de combinadas y Bet Builders (ej. `3/3 goles`, `2/2 remates`, `7/9 córners`).
 - **🇦🇷 Casas de Apuestas Integradas:** Selector táctil con las casas autorizadas en Argentina (*Betsson, Betano, Bet365, Codere, bplay, Jugadon, Casino BA*) e internacionales (*Stake, 1xBet, Pinnacle, Betfair*).
 - **🧮 Motor Multiformato de Cuotas:** Conversión y visualización instantánea en **Decimal (`2.50`)**, **Americana (`+150`)**, **Fraccional (`3/2`)** y **Probabilidad Implícita (`40%`)**.

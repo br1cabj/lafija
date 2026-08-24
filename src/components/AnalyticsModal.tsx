@@ -78,13 +78,13 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
         <div className='flex items-center gap-3.5'>
           <div className='w-14 h-14 rounded-lg bg-linear-to-br from-brand to-[#B33600] flex items-center justify-center shadow-lg shadow-orange-950/50 border border-orange-400/40'>
             <span className='text-2xl font-black text-white font-mono-numbers'>
-              {stats.faceitLevel}
+              {stats.rankLevel}
             </span>
           </div>
           <div>
             <div className='flex items-center gap-2'>
               <span className='text-sm font-bold text-white uppercase tracking-wider font-mono'>
-                RANGO: NIVEL {stats.faceitLevel} PRO TIPSTER
+                RANGO: NIVEL {stats.rankLevel} PRO TIPSTER
               </span>
               {stats.winRate >= 60 && stats.roi >= 10 && (
                 <span className='px-1.5 py-0.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono rounded'>

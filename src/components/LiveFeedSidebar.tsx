@@ -17,7 +17,7 @@ export const LiveFeedSidebar: React.FC = () => {
   return (
     <div className='space-y-4'>
       {/* Live Event Stream Card */}
-      <div className='faceit-card p-4 rounded'>
+      <div className='panel-card p-4 rounded'>
         <div className='flex items-center justify-between border-b border-white/10 pb-3 mb-3'>
           <div className='flex items-center gap-2'>
             <span className='flex h-2.5 w-2.5 relative'>
@@ -81,7 +81,7 @@ export const LiveFeedSidebar: React.FC = () => {
 
       {/* Quick Summary of Live Conditions in Play */}
       {liveBets.length > 0 && (
-        <div className='faceit-card p-4 rounded'>
+        <div className='panel-card p-4 rounded'>
           <div className='flex items-center justify-between border-b border-white/10 pb-2 mb-3'>
             <h4 className='text-xs font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-1.5'>
               <Bell className='w-3.5 h-3.5 text-orange-400' />
