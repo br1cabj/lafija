@@ -13,6 +13,12 @@ interface ModalProps {
   /** Extra classes for the panel (bg/border overrides) */
   panelClassName?: string;
   hideCloseButton?: boolean;
+  /**
+   * En pantallas < sm el panel ocupa toda la pantalla (sin bordes ni
+   * padding del overlay); en desktop sigue siendo modal centrado.
+   * Ideal para formularios largos tipo wizard.
+   */
+  fullscreenOnMobile?: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -30,6 +36,7 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidthClass = 'max-w-2xl',
   panelClassName,
   hideCloseButton = false,
+  fullscreenOnMobile = false,
 }) => {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -79,7 +86,10 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
-      className='fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto'
+      className={clsx(
+        'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto',
+        fullscreenOnMobile ? 'p-0 sm:p-4' : 'p-3 sm:p-4',
+      )}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -92,7 +102,10 @@ export const Modal: React.FC<ModalProps> = ({
         aria-label={ariaLabel}
         tabIndex={-1}
         className={clsx(
-          'panel-card border border-white/15 w-full rounded-lg shadow-2xl p-5 md:p-6 my-4 sm:my-8 text-slate-200 outline-none',
+          'panel-card border border-white/15 w-full shadow-2xl text-slate-200 outline-none',
+          fullscreenOnMobile
+            ? 'min-h-dvh sm:min-h-0 rounded-none p-5 sm:rounded-lg sm:my-8 md:p-6'
+            : 'rounded-lg p-5 md:p-6 my-4 sm:my-8',
           maxWidthClass,
           panelClassName,
         )}
