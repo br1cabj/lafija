@@ -331,7 +331,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               type='text'
               value={league}
               onChange={(e) => setLeague(e.target.value)}
-              placeholder='Liga'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -352,7 +351,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               required
               value={homeTeam}
               onChange={(e) => setHomeTeam(e.target.value)}
-              placeholder='Equipo local'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -370,7 +368,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               required
               value={awayTeam}
               onChange={(e) => setAwayTeam(e.target.value)}
-              placeholder='Equipo visitante'
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             />
           </div>
@@ -502,7 +499,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 required
                 value={bookmaker}
                 onChange={(e) => setBookmaker(e.target.value)}
-                placeholder='Casa de apuestas'
                 className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-sm text-white focus:border-brand focus:outline-none'
               />
             </div>

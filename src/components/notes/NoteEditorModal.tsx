@@ -50,7 +50,6 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             type='text'
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder='Título de la nota'
             className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
           />
         </div>
@@ -68,8 +67,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
             rows={8}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder='Escribe tu nota...'
-            className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-brand focus:outline-none resize-y leading-relaxed'
+            className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none resize-y leading-relaxed'
           />
         </div>
 

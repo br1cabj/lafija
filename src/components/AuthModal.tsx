@@ -111,58 +111,67 @@ export const AuthModal: React.FC = () => {
       <form onSubmit={handleSubmit} className='space-y-3'>
         {mode === 'REGISTER' && (
           <div>
-            <label className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'>
-              Nombre de Usuario / Tipster
+            <label
+              htmlFor='auth-name'
+              className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
+            >
+              Usuario
             </label>
             <div className='relative'>
               <User className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500' />
               <input
+                id='auth-name'
                 type='text'
                 required
-                placeholder='ej. BrunoBets'
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-brand focus:outline-none'
+                className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:border-brand focus:outline-none'
               />
             </div>
           </div>
         )}
 
         <div>
-          <label className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'>
-            Correo Electrónico
+          <label
+            htmlFor='auth-email'
+            className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
+          >
+            Email
           </label>
           <div className='relative'>
             <Mail className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500' />
             <input
+              id='auth-email'
               type='email'
               required
               autoComplete='email'
-              placeholder='tu@email.com'
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-brand focus:outline-none'
+              className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:border-brand focus:outline-none'
             />
           </div>
         </div>
 
         <div>
-          <label className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'>
+          <label
+            htmlFor='auth-password'
+            className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
+          >
             Contraseña
           </label>
           <div className='relative'>
             <Lock className='w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500' />
             <input
+              id='auth-password'
               type='password'
               required
               minLength={6}
               autoComplete={
                 mode === 'LOGIN' ? 'current-password' : 'new-password'
               }
-              placeholder='••••••••'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-brand focus:outline-none'
+              className='w-full bg-base border border-white/10 rounded-lg pl-9 pr-3 py-2 text-xs text-white focus:border-brand focus:outline-none'
             />
           </div>
         </div>
