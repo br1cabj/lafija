@@ -6,7 +6,9 @@
 import { effectiveOdds } from '../src/types/bet';
 import type { Bet, BetCondition } from '../src/types/bet';
 import {
+  API_MARKET_LABELS,
   applyLiveUpdate,
+  detectApiCategory,
   findFixtureForBet,
   isAutoTrackable,
   namesMatch,
@@ -627,6 +629,40 @@ test('props de jugador SIEMPRE manuales aunque mencionen métricas', () => {
   assert(isAutoTrackable('Tiros Totales', '+25.5 Tiros totales'), 'tiros equipo');
   assert(isAutoTrackable('Goles', 'Más de 2.5'), 'goles');
   assert(!isAutoTrackable('', ''), 'vacío');
+});
+
+test('detectApiCategory devuelve la categoria canonica correcta', () => {
+  const cases: Array<[string, string, string]> = [
+    ['Córners Totales', '+8.5 Córners', 'corners'],
+    ['Tarjetas', '+3.5', 'cards'],
+    ['Tiros a Puerta', 'Equipo 5+ tiros al arco', 'shotsOnTarget'],
+    ['Tiros Totales', '+25.5 tiros totales', 'shots'],
+    ['Faltas', 'Más de 20', 'fouls'],
+    ['Goles Totales', '+2.5 Goles', 'goals'],
+    ['Props de Jugador', 'Jugador 1+ tiro al arco', ''],
+    ['Mercado raro', 'lo que sea', ''],
+  ];
+  for (const [market, sel, expected] of cases) {
+    const cat = detectApiCategory(market, sel);
+    assert(
+      (cat ?? '') === expected,
+      `"${market}/${sel}" -> esperaba ${expected || 'null'}, dio ${cat}`,
+    );
+  }
+});
+
+test('etiquetas API existen para todas las categorias', () => {
+  for (const cat of [
+    'corners',
+    'cards',
+    'shotsOnTarget',
+    'shots',
+    'fouls',
+    'goals',
+  ] as const) {
+    const label = API_MARKET_LABELS[cat];
+    assert(typeof label === 'string' && label.length > 0, `sin label para ${cat}`);
+  }
 });
 
 // ---- Resumo -----------------------------------------------------------------

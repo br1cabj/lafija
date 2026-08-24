@@ -25,7 +25,13 @@ import {
   Repeat,
   RotateCcw,
   ShieldAlert,
+  Zap,
+  Hand,
 } from 'lucide-react';
+import {
+  API_MARKET_LABELS,
+  detectApiCategory,
+} from '../utils/liveSync';
 
 interface BetCardProps {
   bet: Bet;
@@ -420,14 +426,37 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
                     <Clock className='h-4 w-4 shrink-0 text-slate-500' />
                   )}
                   <div className='min-w-0'>
-                    {cond.market && (
-                      <span
-                        className='block truncate text-[9px] font-semibold tracking-wider text-slate-500 uppercase'
-                        title={cond.market}
-                      >
-                        {cond.market}
-                      </span>
-                    )}
+                    {(() => {
+                      // Chip de mercado: nombre canonico de la API cuando
+                      // hay match; el texto del usuario en ambar si no.
+                      const apiCategory = detectApiCategory(
+                        cond.market,
+                        cond.selection,
+                      );
+                      if (apiCategory) {
+                        return (
+                          <span
+                            title={`Trackeado automáticamente con datos reales: ${API_MARKET_LABELS[apiCategory]}`}
+                            className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-sky-500/25 bg-sky-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-sky-300 uppercase'
+                          >
+                            <Zap className='h-2.5 w-2.5 shrink-0' />
+                            {API_MARKET_LABELS[apiCategory]}
+                          </span>
+                        );
+                      }
+                      if (cond.market) {
+                        return (
+                          <span
+                            title={`Sin coincidencia con la API: "${cond.market}" — seguimiento manual con + / -`}
+                            className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-amber-500/25 bg-amber-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-amber-400/90 uppercase'
+                          >
+                            <Hand className='h-2.5 w-2.5 shrink-0' />
+                            {cond.market}
+                          </span>
+                        );
+                      }
+                      return null;
+                    })()}
                     <span
                       className={`block truncate font-medium ${
                         isVoid

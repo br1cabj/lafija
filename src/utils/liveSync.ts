@@ -91,6 +91,55 @@ const totalGoals = (fixture: LiveFixture): number =>
  * corresponde. Devuelve null para condiciones no mapeables automáticamente
  * (props de jugador, condiciones por equipo o de resultado).
  */
+/**
+ * Categorías de mercado que la app puede trackear con la API.
+ * Es la fuente única de verdad: la usan el tracker (statForCondition),
+ * el formulario (isAutoTrackable) y la tarjeta (chip de mercado).
+ */
+export type ApiStatCategory =
+  | 'corners'
+  | 'cards'
+  | 'shotsOnTarget'
+  | 'shots'
+  | 'fouls'
+  | 'goals';
+
+/** Nombre canónico del mercado tal como lo reporta la API. */
+export const API_MARKET_LABELS: Record<ApiStatCategory, string> = {
+  corners: 'Córners del partido',
+  cards: 'Tarjetas',
+  shotsOnTarget: 'Tiros al arco',
+  shots: 'Tiros totales',
+  fouls: 'Faltas',
+  goals: 'Goles del partido',
+};
+
+const PLAYER_PROP_RE = /jugador|player|props/;
+
+/**
+ * Detecta a qué categoría de la API corresponde una condición según su texto.
+ * null = sin coincidencia (seguimiento manual). Orden de detección importa:
+ * "al arco" antes que "tiros" genérico, córners/tarjetas antes que goles.
+ */
+export function detectApiCategory(
+  market: string,
+  selection: string,
+): ApiStatCategory | null {
+  const text = normalizeName(`${market} ${selection}`);
+  if (!text) return null;
+  // Props de jugador: ninguna fuente gratuita da stats individuales
+  if (PLAYER_PROP_RE.test(text)) return null;
+
+  if (/corner/.test(text)) return 'corners';
+  if (/tarjeta|card/.test(text)) return 'cards';
+  if (/alarco|apuerta|ontarget|sot|encuadrado/.test(text))
+    return 'shotsOnTarget';
+  if (/tiro|remate|shot|chance/.test(text)) return 'shots';
+  if (/falta|foul/.test(text)) return 'fouls';
+  if (/gol|goal/.test(text)) return 'goals';
+  return null;
+}
+
 export function statForCondition(
   cond: BetCondition,
   fixture: LiveFixture,
@@ -98,50 +147,32 @@ export function statForCondition(
 ): number | null {
   if (!isNumericCondition(cond)) return null;
 
-  const text = normalizeName(`${cond.market} ${cond.selection}`);
-
-  // Props de jugador: ninguna fuente gratuita da stats individuales -> manual
-  if (/jugador|player|props/.test(text)) return null;
-
-  // El orden importa: córners/tarjetas antes que goles.
   // Si la categoría no viene en stats (proveedor sin ese dato), null:
   // nunca se auto-marca con ceros inventados.
-  if (/corner/.test(text)) {
-    return stats?.corners ? stats.corners.total : null;
+  switch (detectApiCategory(cond.market, cond.selection)) {
+    case 'corners':
+      return stats?.corners ? stats.corners.total : null;
+    case 'cards':
+      return stats?.cards ? stats.cards.total : null;
+    case 'shotsOnTarget':
+      return stats?.shotsOnTarget ? stats.shotsOnTarget.total : null;
+    case 'shots':
+      return stats?.shots ? stats.shots.total : null;
+    case 'fouls':
+      return stats?.fouls ? stats.fouls.total : null;
+    case 'goals':
+      // "Más/Menos de X goles" sobre el total del partido
+      return totalGoals(fixture);
+    default:
+      return null;
   }
-  if (/tarjeta|card/.test(text)) {
-    return stats?.cards ? stats.cards.total : null;
-  }
-  if (/alarco|apuerta|ontarget|sot|encuadrado/.test(text)) {
-    return stats?.shotsOnTarget ? stats.shotsOnTarget.total : null;
-  }
-  if (/tiro|remate|shot|chance/.test(text)) {
-    return stats?.shots ? stats.shots.total : null;
-  }
-  if (/falta|foul/.test(text)) {
-    return stats?.fouls ? stats.fouls.total : null;
-  }
-  if (/gol|goal/.test(text)) {
-    // "Más/Menos de X goles" sobre el total del partido
-    return totalGoals(fixture);
-  }
-
-  return null;
 }
 
 /**
  * true si la condición será trackeada automáticamente por el sync.
- * Misma lógica que statForCondition, expuesta para el feedback
- * AUTO/MANUAL del formulario (y para tests).
  */
 export function isAutoTrackable(market: string, selection: string): boolean {
-  const text = normalizeName(`${market} ${selection}`);
-  if (!text) return false;
-  // Props de jugador nunca son automáticas
-  if (/jugador|player|props/.test(text)) return false;
-  return /corner|tarjeta|card|alarco|apuerta|ontarget|sot|encuadrado|tiro|remate|shot|chance|falta|foul|gol|goal/.test(
-    text,
-  );
+  return detectApiCategory(market, selection) !== null;
 }
 
 /** Traduce el status corto de API-Sports al estado interno del match. */

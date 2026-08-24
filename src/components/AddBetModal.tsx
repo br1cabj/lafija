@@ -7,7 +7,10 @@ import type {
   SportType,
 } from '../types/bet';
 import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
-import { isAutoTrackable } from '../utils/liveSync';
+import {
+  API_MARKET_LABELS,
+  detectApiCategory,
+} from '../utils/liveSync';
 import { SPORT_OPTIONS } from '../data/sports';
 import {
   parseInputToDecimal,
@@ -630,7 +633,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
           </div>
 
           {conditions.map((c, idx) => {
-            const auto = isAutoTrackable(c.market, c.selection);
+            const apiCategory = detectApiCategory(c.market, c.selection);
+            const auto = apiCategory !== null;
             return (
             <div
               key={idx}
@@ -663,16 +667,16 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                   <span
                     title={
                       auto
-                        ? 'El tracker actualizará esta condición automáticamente con datos reales'
-                        : 'Sin tracking automático: actualizala manualmente con los botones + / -'
+                        ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
+                        : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
                     }
-                    className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
+                    className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
                       auto
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : 'bg-white/5 text-slate-500'
+                        ? 'bg-sky-500/15 text-sky-300'
+                        : 'bg-amber-500/10 text-amber-400/90'
                     }`}
                   >
-                    {auto ? '⚡ AUTO' : '✋ MANUAL'}
+                    {auto ? `⚡ ${API_MARKET_LABELS[apiCategory]}` : '✋ MANUAL'}
                   </span>
                 )}
               </div>
