@@ -5,6 +5,24 @@ export interface BookmakerInfo {
   region: 'AR' | 'GLOBAL' | 'CRYPTO';
   badgeLabel: string;
   color: string;
+  /**
+   * Nombre que usa la casa para la herencia a suplentes en mercados de
+   * jugador (bet365: "Sub On Play On", Paddy Power: "Super Sub", etc.).
+   * Si no está definido se usa un término genérico.
+   */
+  superSubLabel?: string;
+}
+
+/** Término genérico cuando la casa no tiene nombre propio para Super Sub. */
+export const DEFAULT_SUPER_SUB_LABEL = 'Suplente hereda';
+
+export function getSuperSubLabel(bookmakerName: string): string {
+  const bm = POPULAR_BOOKMAKERS.find(
+    (b) =>
+      b.name.toLowerCase().includes(bookmakerName.toLowerCase()) ||
+      b.shortName.toLowerCase() === bookmakerName.toLowerCase(),
+  );
+  return bm?.superSubLabel ?? DEFAULT_SUPER_SUB_LABEL;
 }
 
 export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
@@ -27,6 +45,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
   },
   {
     id: 'bet365',
+    superSubLabel: 'Sub On Play On',
     name: 'Bet365 Argentina',
     shortName: 'Bet365',
     region: 'AR',

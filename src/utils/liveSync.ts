@@ -1,6 +1,7 @@
 import type { Bet, BetCondition, MatchInfo } from '../types/bet';
 import { isNumericCondition } from '../types/bet';
 import { computeCashout } from './simulation';
+import { expandAlias } from '../data/teamAliases';
 import type { LiveFixture, LiveFixtureStats } from '../services/sportsApi';
 
 /** Normaliza nombres de equipos para el matching (minúsculas, sin acentos). */
@@ -12,26 +13,72 @@ export function normalizeName(name: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
+/** Tokens significativos de un nombre (para matching difuso). */
+function nameTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length >= 3);
+}
+
 /**
- * Encuentra el partido en vivo que corresponde a una apuesta
- * comparando equipos local/visitante en ambos sentidos.
+ * Matching difuso entre dos nombres de equipo:
+ * 1. Igualdad exacta normalizada o vía diccionario de alias.
+ * 2. Intersección de tokens (>= 3 letras): "Man City" ~ "Manchester City".
+ */
+export function namesMatch(a: string, b: string): boolean {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+
+  const formsA = expandAlias(na);
+  const formsB = expandAlias(nb);
+  if (formsA.some((fa) => formsB.includes(fa))) return true;
+
+  const tokensA = new Set(nameTokens(a));
+  const tokensB = new Set(nameTokens(b));
+  for (const t of tokensA) {
+    if (tokensB.has(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * Encuentra el partido en vivo que corresponde a una apuesta.
+ * Cascada: match exacto por teamId (del autocomplete) -> matching difuso
+ * por nombres (alias + tokens) en ambos sentidos local/visitante.
  */
 export function findFixtureForBet(
   bet: Bet,
   fixtures: LiveFixture[],
 ): LiveFixture | null {
-  const home = normalizeName(bet.match.homeTeam);
-  const away = normalizeName(bet.match.awayTeam);
+  const homeId = bet.match.homeTeamId;
+  const awayId = bet.match.awayTeamId;
+
+  if (homeId && awayId) {
+    const byId = fixtures.find(
+      (f) =>
+        (f.homeTeamId === homeId && f.awayTeamId === awayId) ||
+        (f.homeTeamId === awayId && f.awayTeamId === homeId),
+    );
+    if (byId) return byId;
+  }
+
+  const home = bet.match.homeTeam;
+  const away = bet.match.awayTeam;
   if (!home || !away) return null;
 
   return (
     fixtures.find((f) => {
-      const fHome = normalizeName(f.homeTeam);
-      const fAway = normalizeName(f.awayTeam);
-      return (
-        (fHome.includes(home) || home.includes(fHome)) &&
-        (fAway.includes(away) || away.includes(fAway))
-      );
+      const direct =
+        namesMatch(f.homeTeam, home) && namesMatch(f.awayTeam, away);
+      const swapped =
+        namesMatch(f.homeTeam, away) && namesMatch(f.awayTeam, home);
+      return direct || swapped;
     }) ?? null
   );
 }
@@ -96,6 +143,10 @@ function mapMatchInfo(
             ? '2H'
             : 'OT';
       break;
+    case 'LIVE':
+      status = 'LIVE';
+      period = current.period ?? '1H';
+      break;
     case 'HT':
       status = 'LIVE';
       period = 'HT';
@@ -110,6 +161,7 @@ function mapMatchInfo(
     case 'CANC':
     case 'ABD':
     case 'SUSP':
+    case 'POSTPONED':
       status = 'POSTPONED';
       break;
     default:
@@ -134,6 +186,18 @@ export interface LiveSyncResult {
 }
 
 /**
+ * true si la apuesta tiene condiciones que dependen de estadísticas
+ * granulares (córners/tarjetas/remates/faltas) y por lo tanto justifica
+ * pedir el endpoint de stats. Las de goles se resuelven con el marcador.
+ */
+export function needsStats(bet: Bet): boolean {
+  return bet.conditions.some((c) => {
+    const text = normalizeName(`${c.market} ${c.selection}`);
+    return /corner|tarjeta|card|tiro|remate|shot|falta|foul/.test(text);
+  });
+}
+
+/**
  * Aplica los datos reales del partido a una apuesta LIVE.
  * Función pura: no auto-asienta la apuesta (WON/LOST sigue siendo manual);
  * solo actualiza marcador, minuto y valores/estado de las condiciones.
@@ -149,6 +213,8 @@ export function applyLiveUpdate(
   const minuteNum = parseInt(fixture.minute.replace(/[^0-9]/g, ''), 10) || 0;
 
   const newConditions = bet.conditions.map((cond): BetCondition => {
+    // Anuladas por suspensión: quedan congeladas (aportan cuota 1.0)
+    if (cond.status === 'VOID') return cond;
     const value = statForCondition(cond, fixture, stats);
     if (value === null || !isNumericCondition(cond)) return cond;
     if (value <= cond.currentValue) return cond;

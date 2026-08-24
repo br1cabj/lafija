@@ -6,7 +6,7 @@ import type {
   ConditionStatus,
   SportType,
 } from '../types/bet';
-import { POPULAR_BOOKMAKERS } from '../data/bookmakers';
+import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
 import { SPORT_OPTIONS } from '../data/sports';
 import {
   parseInputToDecimal,
@@ -18,6 +18,7 @@ import {
 } from '../utils/odds';
 import { Modal } from './ui/Modal';
 import { OddsFormatTabs } from './ui/OddsFormatTabs';
+import { TeamInput } from './ui/TeamInput';
 import {
   Plus,
   Trash2,
@@ -30,7 +31,7 @@ import {
 
 type ConditionField = keyof Pick<
   BetCondition,
-  'market' | 'selection' | 'currentValue' | 'targetValue'
+  'market' | 'selection' | 'currentValue' | 'targetValue' | 'odds'
 >;
 
 /** Fila en blanco para empezar a cargar condiciones desde cero. */
@@ -60,6 +61,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const [league, setLeague] = useState('');
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
+  const [homeTeamId, setHomeTeamId] = useState<number | undefined>(undefined);
+  const [awayTeamId, setAwayTeamId] = useState<number | undefined>(undefined);
   const [betType, setBetType] = useState<BetType>('bet_builder');
   const [stake, setStake] = useState('');
   const [inputOddsFormat, setInputOddsFormat] = useState<OddsFormat>(
@@ -149,6 +152,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
 
   const parsedStake = parseFloat(stake.replace(',', '.')) || 0;
   const parsedOdds = parseInputToDecimal(oddsInput, inputOddsFormat);
+  const superSubLabel = getSuperSubLabel(bookmaker || 'Betsson');
   const oddsError =
     oddsInput.trim() !== '' && parsedOdds === null
       ? 'Cuota inválida para el formato seleccionado.'
@@ -198,6 +202,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       match: {
         homeTeam: homeTeam || 'Equipo Local',
         awayTeam: awayTeam || 'Equipo Visitante',
+        homeTeamId,
+        awayTeamId,
         homeScore: isLive ? 0 : undefined,
         awayScore: isLive ? 0 : undefined,
         minute: isLive ? "01'" : undefined,
@@ -338,37 +344,25 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
 
         {/* Teams / Event */}
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-          <div>
-            <label
-              htmlFor='abm-home'
-              className='text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1'
-            >
-              Equipo Local / Jugador 1
-            </label>
-            <input
-              id='abm-home'
-              type='text'
-              required
-              value={homeTeam}
-              onChange={(e) => setHomeTeam(e.target.value)}
-              className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
-            />
-          </div>
+          <TeamInput
+            id='abm-home'
+            label='Equipo Local / Jugador 1'
+            value={homeTeam}
+            onChange={(name, teamId) => {
+              setHomeTeam(name);
+              setHomeTeamId(teamId);
+            }}
+          />
 
           <div>
-            <label
-              htmlFor='abm-away'
-              className='text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1'
-            >
-              Equipo Visitante / Jugador 2
-            </label>
-            <input
+            <TeamInput
               id='abm-away'
-              type='text'
-              required
+              label='Equipo Visitante / Jugador 2'
               value={awayTeam}
-              onChange={(e) => setAwayTeam(e.target.value)}
-              className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
+              onChange={(name, teamId) => {
+                setAwayTeam(name);
+                setAwayTeamId(teamId);
+              }}
             />
           </div>
         </div>
@@ -687,7 +681,50 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                     }
                     className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold'
                   />
+                  <input
+                    type='number'
+                    step='0.01'
+                    min='1'
+                    aria-label='Cuota de la selección (opcional)'
+                    title='Cuota individual — permite recalcular la apuesta si una condición se anula'
+                    placeholder='x'
+                    value={c.odds ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const value = raw === '' ? undefined : parseFloat(raw) || undefined;
+                      setConditions((prev) =>
+                        prev.map((cond, i) =>
+                          i === idx ? recalcProgress({ ...cond, odds: value }) : cond,
+                        ),
+                      );
+                    }}
+                    className='w-12 bg-panel border border-white/10 rounded px-1 py-1.5 text-xs text-slate-300 text-center font-mono-numbers'
+                  />
                 </div>
+
+                {/* Super Sub: la línea hereda al suplente si hay cambio */}
+                <button
+                  type='button'
+                  role='switch'
+                  aria-checked={Boolean(c.superSub)}
+                  aria-label='Super Sub: la línea hereda al suplente'
+                  title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}                  onClick={() => {
+                    setConditions((prev) =>
+                      prev.map((cond, i) =>
+                        i === idx
+                          ? { ...cond, superSub: !cond.superSub }
+                          : cond,
+                      ),
+                    );
+                  }}
+                  className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                    c.superSub
+                      ? 'bg-brand/20 border-brand/50 text-brand'
+                      : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  SS
+                </button>
 
                 {conditions.length > 1 && (
                   <button

@@ -9,12 +9,13 @@ import React, {
   type ReactNode,
 } from 'react';
 import type { Bet, UserStats, LiveEventLog } from '../types/bet';
+import { effectiveOdds } from '../types/bet';
 import type { Note } from '../types/note';
 import type { OddsFormat } from '../utils/odds';
 import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
 import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
-import { findFixtureForBet, applyLiveUpdate } from '../utils/liveSync';
+import { findFixtureForBet, applyLiveUpdate, needsStats } from '../utils/liveSync';
 import {
   fetchLiveFixtures,
   fetchFixtureStats,
@@ -78,6 +79,10 @@ interface BetContextType {
   ) => void;
   cashoutBet: (betId: string) => void;
   settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void;
+  /** Anula condiciones por suspensión del partido (regla de cuota 1.0). */
+  voidConditions: (betId: string, conditionIds: string[]) => void;
+  /** Super Sub: la línea de la selección hereda al suplente que entró. */
+  swapPlayer: (betId: string, conditionId: string, newSelection: string) => void;
   setBetStatus: (betId: string, status: Bet['status']) => void;
 }
 
@@ -92,6 +97,8 @@ const REAL_MODE_KEY = 'lafija_real_mode_v1';
 const DEFAULT_INITIAL_BANKROLL = 0;
 /** Intervalo de sincronización con datos reales (ms). */
 const REAL_SYNC_INTERVAL_MS = 60_000;
+/** Cadencia mínima de fetch de estadísticas por partido (ms): cambian lento. */
+const STATS_TTL_MS = 3 * 60_000;
 
 function readLocalStorage(key: string): string | null {
   try {
@@ -360,6 +367,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
   // ---- Modo datos reales (polling de partidos en vivo vía /api/sports) ----
 
   const realSyncingRef = useRef(false);
+  // Última vez que se pidieron stats por evento (cadencia STATS_TTL_MS)
+  const statsFetchedAtRef = useRef<Map<number, number>>(new Map());
 
   const syncLiveData = useCallback(async () => {
     if (realSyncingRef.current) return;
@@ -374,17 +383,24 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         return;
       }
 
-      const statsCache = new Map<number, LiveFixtureStats | null>();
       const updates: { bet: Bet; hits: string[]; title: string }[] = [];
+      const linkedFlags = new Map<string, boolean>();
 
       for (const bet of liveBets) {
         const fixture = findFixtureForBet(bet, fixtures);
+        // Flag para el aviso de "seguimiento manual" en la tarjeta
+        linkedFlags.set(bet.id, Boolean(fixture?.fixtureId));
         if (!fixture || !fixture.fixtureId) continue;
 
-        let stats = statsCache.get(fixture.fixtureId);
-        if (stats === undefined) {
-          stats = await fetchFixtureStats(fixture.fixtureId);
-          statsCache.set(fixture.fixtureId, stats);
+        // Stats solo si hay condiciones que las necesitan (córners, tarjetas,
+        // remates, faltas) y como máximo cada 3 min por partido: cambian lento.
+        let stats: LiveFixtureStats | null = null;
+        if (fixture.statsId && needsStats(bet)) {
+          const last = statsFetchedAtRef.current.get(fixture.statsId) ?? 0;
+          if (Date.now() - last >= STATS_TTL_MS) {
+            stats = await fetchFixtureStats(fixture.statsId);
+            statsFetchedAtRef.current.set(fixture.statsId, Date.now());
+          }
         }
 
         const result = applyLiveUpdate(bet, fixture, stats);
@@ -397,10 +413,19 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      if (updates.length > 0) {
-        const updateMap = new Map(updates.map((u) => [u.bet.id, u]));
-        setBets((prev) => prev.map((b) => updateMap.get(b.id)?.bet ?? b));
+      // Aplica updates de datos + flags de vinculación en una sola pasada
+      const updateMap = new Map(updates.map((u) => [u.bet.id, u]));
+      setBets((prev) =>
+        prev.map((b) => {
+          const updated = updateMap.get(b.id)?.bet;
+          if (updated) return { ...updated, match: { ...updated.match, linked: true } };
+          const linked = linkedFlags.get(b.id);
+          if (linked === undefined || linked === b.match.linked) return b;
+          return { ...b, match: { ...b.match, linked } };
+        }),
+      );
 
+      if (updates.length > 0) {
         const logs: LiveEventLog[] = updates.flatMap((u) =>
           u.hits.map((selection) => ({
             id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -518,10 +543,77 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       sounds.playClickSound();
     }
     setBets((prev) =>
-      prev.map((bet) =>
-        bet.id === betId ? { ...bet, status: outcome } : bet,
-      ),
+      prev.map((bet) => {
+        if (bet.id !== betId) return bet;
+        // Con condiciones anuladas, el payout se calcula sobre la cuota
+        // efectiva (las anuladas aportan 1.0).
+        const payout =
+          outcome === 'WON'
+            ? Number((bet.stake * effectiveOdds(bet)).toFixed(2))
+            : bet.potentialPayout;
+        return { ...bet, status: outcome, potentialPayout: payout };
+      }),
     );
+  };
+
+  const voidConditions = (betId: string, conditionIds: string[]) => {
+    sounds.playClickSound();
+    const ids = new Set(conditionIds);
+    setBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id !== betId) return bet;
+        const conditions = bet.conditions.map((c) =>
+          ids.has(c.id) ? { ...c, status: 'VOID' as const, isLock: true } : c,
+        );
+        // Si se anulan todas, la apuesta completa pasa a VOID (reembolso).
+        const allVoid =
+          conditions.length > 0 && conditions.every((c) => c.status === 'VOID');
+        return {
+          ...bet,
+          conditions,
+          status: allVoid ? ('VOID' as const) : bet.status,
+        };
+      }),
+    );
+    pushLog({
+      id: `log-${Date.now()}`,
+      time: 'VOID',
+      betId,
+      matchTitle: 'Partido suspendido',
+      text: `${conditionIds.length} condición(es) anulada(s) — aportan cuota 1.0`,
+      type: 'INFO',
+    });
+  };
+
+  const swapPlayer = (
+    betId: string,
+    conditionId: string,
+    newSelection: string,
+  ) => {
+    sounds.playClickSound();
+    setBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id !== betId) return bet;
+        const conditions = bet.conditions.map((c) => {
+          if (c.id !== conditionId) return c;
+          return {
+            ...c,
+            selection: newSelection,
+            // Conserva el jugador original de la primera herencia
+            supersubFrom: c.supersubFrom ?? c.selection,
+          };
+        });
+        return { ...bet, conditions };
+      }),
+    );
+    pushLog({
+      id: `log-${Date.now()}`,
+      time: 'SUB',
+      betId,
+      matchTitle: 'Super Sub',
+      text: `Cambio: la línea hereda al suplente`,
+      type: 'INFO',
+    });
   };
 
   const setBetStatus = (betId: string, status: Bet['status']) => {
@@ -583,6 +675,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         updateCondition,
         cashoutBet,
         settleBet,
+        voidConditions,
+        swapPlayer,
         setBetStatus,
       }}
     >

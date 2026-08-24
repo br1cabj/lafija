@@ -1,11 +1,14 @@
 import { useState, useRef, memo } from 'react';
 import type { Bet, BetCondition } from '../types/bet';
-import { formatConditionValue } from '../types/bet';
+import { effectiveOdds, formatConditionValue } from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
 import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Modal } from './ui/Modal';
 import {
+  Ban,
   CheckCircle2,
   XCircle,
   Clock,
@@ -19,7 +22,9 @@ import {
   ChevronUp,
   Flame,
   Play,
+  Repeat,
   RotateCcw,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface BetCardProps {
@@ -34,26 +39,47 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
     settleBet,
     setBetStatus,
     deleteBet,
+    voidConditions,
+    swapPlayer,
     oddsFormat,
     currencySymbol,
+    isRealMode,
   } = useBets();
   const [showMenu, setShowMenu] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showSuspendDialog, setShowSuspendDialog] = useState(false);
+  const [swapConditionId, setSwapConditionId] = useState<string | null>(null);
+  const [swapText, setSwapText] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(menuRef, () => setShowMenu(false), showMenu);
 
-  const totalConditions = bet.conditions.length;
-  const metConditions = bet.conditions.filter((c) => c.status === 'MET').length;
+  // Las condiciones anuladas no cuentan para el progreso (aportan cuota 1.0)
+  const activeConditions = bet.conditions.filter((c) => c.status !== 'VOID');
+  const totalConditions = activeConditions.length;
+  const metConditions = activeConditions.filter((c) => c.status === 'MET').length;
   const pendingConditions = totalConditions - metConditions;
   const globalProgress =
     totalConditions > 0
       ? Math.round((metConditions / totalConditions) * 100)
       : 0;
+  const hasVoidedConditions = bet.conditions.some((c) => c.status === 'VOID');
+  const effOdds = hasVoidedConditions ? effectiveOdds(bet) : bet.odds;
+  const effPayout = bet.stake * effOdds;
 
   // Alerta de match point: falta una sola condición para el cobro
   const isMatchPoint =
     bet.status === 'LIVE' && totalConditions >= 2 && pendingConditions === 1;
+
+  // Partido suspendido/aplazado con apuesta en juego: sugerir anulación
+  const isSuspended = bet.match.status === 'POSTPONED' && bet.status === 'LIVE';
+
+  const swapCondition = bet.conditions.find((c) => c.id === swapConditionId);
+
+  const openSwapDialog = (cond: BetCondition) => {
+    setSwapConditionId(cond.id);
+    setSwapText(cond.selection);
+  };
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
 
@@ -107,6 +133,13 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
             <Badge variant='cashout'>
               Retirada ({currencySymbol}
               {bet.cashoutValue?.toFixed(2)})
+            </Badge>
+          )}
+
+          {bet.status === 'VOID' && (
+            <Badge variant='neutral'>
+              <Ban className='h-3 w-3' />
+              Anulada · stake devuelto
             </Badge>
           )}
 
@@ -190,6 +223,16 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                     </button>
                     <button
                       onClick={() => {
+                        setShowSuspendDialog(true);
+                        setShowMenu(false);
+                      }}
+                      className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
+                    >
+                      <ShieldAlert className='h-3.5 w-3.5 text-amber-400' />{' '}
+                      Suspensión del partido…
+                    </button>
+                    <button
+                      onClick={() => {
                         setBetStatus(bet.id, 'PENDING');
                         setShowMenu(false);
                       }}
@@ -199,6 +242,19 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                       (pre-partido)
                     </button>
                   </>
+                )}
+
+                {bet.status === 'PENDING' && (
+                  <button
+                    onClick={() => {
+                      settleBet(bet.id, 'VOID');
+                      setShowMenu(false);
+                    }}
+                    className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
+                  >
+                    <Ban className='h-3.5 w-3.5 text-slate-400' /> Anular
+                    (suspendido / cancelado)
+                  </button>
                 )}
 
                 {(bet.status === 'WON' ||
@@ -250,6 +306,35 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
         </h3>
       </button>
 
+      {/* Banner de suspensión detectada por datos reales */}
+      {isSuspended && !hasVoidedConditions && (
+        <div className='mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2'>
+          <span className='flex items-center gap-2 text-xs font-medium text-amber-300'>
+            <ShieldAlert className='h-4 w-4 shrink-0' />
+            Partido suspendido — podés anular o esperar reanudación (24-48hs)
+          </span>
+          <Button
+            size='sm'
+            variant='secondary'
+            onClick={() => setShowSuspendDialog(true)}
+          >
+            Anular…
+          </Button>
+        </div>
+      )}
+
+      {/* Aviso: el live sync no encontró este partido en la API */}
+      {bet.status === 'LIVE' &&
+        isRealMode &&
+        bet.match.linked === false &&
+        !isSuspended && (
+          <div className='mb-3 flex items-center gap-2 rounded-md border border-white/10 bg-panel px-3 py-2 text-xs text-slate-400'>
+            <ShieldAlert className='h-3.5 w-3.5 shrink-0 text-slate-500' />
+            Seguimiento manual — no se encontró el partido en la API. Los
+            valores no se actualizan solos.
+          </div>
+        )}
+
       {/* Strip financiero */}
       <div className='font-mono-numbers mb-3 flex items-center justify-between rounded-md border border-white/5 bg-base px-3 py-2 text-sm'>
         <div>
@@ -266,7 +351,12 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
             Cuota ({ODDS_FORMAT_SHORT[oddsFormat]})
           </span>
           <span className='text-xs font-bold text-orange-400'>
-            {formatOdds(bet.odds, oddsFormat)}
+            {formatOdds(effOdds, oddsFormat)}
+            {hasVoidedConditions && (
+              <span className='ml-1 font-normal text-slate-500 line-through'>
+                {formatOdds(bet.odds, oddsFormat)}
+              </span>
+            )}
           </span>
         </div>
         <div className='text-right'>
@@ -275,7 +365,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
           </span>
           <span className='text-xs font-bold text-emerald-400'>
             {currencySymbol}
-            {bet.potentialPayout.toFixed(2)}
+            {effPayout.toFixed(2)}
           </span>
         </div>
       </div>
@@ -287,23 +377,28 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
             const isMet = cond.status === 'MET';
             const isBusted = cond.status === 'BUSTED';
             const isClutch = cond.status === 'CLUTCH_DANGER';
+            const isVoid = cond.status === 'VOID';
 
             return (
               <li
                 key={cond.id}
-                title={cond.dangerNote}
+                title={cond.supersubFrom ? `Super Sub — heredó de: ${cond.supersubFrom}` : cond.dangerNote}
                 className={`flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm transition-colors ${
-                  isMet
-                    ? 'border-emerald-500/25 bg-emerald-500/5'
-                    : isBusted
-                      ? 'border-red-500/25 bg-red-500/5'
-                      : isClutch
-                        ? 'border-amber-500/30 bg-amber-500/5'
-                        : 'border-white/10 bg-panel'
+                  isVoid
+                    ? 'border-white/5 bg-black/20 opacity-60'
+                    : isMet
+                      ? 'border-emerald-500/25 bg-emerald-500/5'
+                      : isBusted
+                        ? 'border-red-500/25 bg-red-500/5'
+                        : isClutch
+                          ? 'border-amber-500/30 bg-amber-500/5'
+                          : 'border-white/10 bg-panel'
                 }`}
               >
                 <div className='flex min-w-0 items-center gap-2.5'>
-                  {isMet ? (
+                  {isVoid ? (
+                    <Ban className='h-4 w-4 shrink-0 text-slate-500' />
+                  ) : isMet ? (
                     <CheckCircle2 className='h-4 w-4 shrink-0 text-emerald-400' />
                   ) : isBusted ? (
                     <XCircle className='h-4 w-4 shrink-0 text-red-400' />
@@ -312,31 +407,72 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                   ) : (
                     <Clock className='h-4 w-4 shrink-0 text-slate-500' />
                   )}
-                  <span
-                    className={`truncate font-medium ${
-                      isMet
-                        ? 'text-emerald-300'
-                        : isBusted
-                          ? 'text-red-300 line-through decoration-red-400/50'
-                          : isClutch
-                            ? 'text-amber-300'
-                            : 'text-slate-200'
-                    }`}
-                  >
-                    {cond.selection}
-                  </span>
+                  <div className='min-w-0'>
+                    <span
+                      className={`block truncate font-medium ${
+                        isVoid
+                          ? 'text-slate-500 line-through'
+                          : isMet
+                            ? 'text-emerald-300'
+                            : isBusted
+                              ? 'text-red-300 line-through decoration-red-400/50'
+                              : isClutch
+                                ? 'text-amber-300'
+                                : 'text-slate-200'
+                      }`}
+                    >
+                      {cond.selection}
+                    </span>
+                    {cond.supersubFrom && (
+                      <span className='block truncate text-[10px] text-slate-500'>
+                        Super Sub · heredó de {cond.supersubFrom}
+                      </span>
+                    )}
+                  </div>
+                  {cond.superSub && !isVoid && !cond.supersubFrom && (
+                    <span
+                      title='Super Sub: la línea hereda al suplente'
+                      className='shrink-0 rounded-sm border border-brand/40 bg-brand/10 px-1 py-0.5 text-[9px] font-bold text-brand'
+                    >
+                      SS
+                    </span>
+                  )}
                 </div>
 
                 {/* Valor actual y controles +/- */}
                 <div className='font-mono-numbers flex shrink-0 items-center gap-2'>
-                  <span
-                    className={`text-sm font-bold ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
-                  >
-                    {formatConditionValue(cond)}
-                  </span>
+                  {!isVoid && (
+                    <span
+                      className={`text-sm font-bold ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
+                    >
+                      {formatConditionValue(cond)}
+                    </span>
+                  )}
+                  {isVoid && (
+                    <span className='text-[10px] font-semibold tracking-wide text-slate-500 uppercase'>
+                      Cuota 1.0
+                    </span>
+                  )}
+
+                  {/* Super Sub: cambiar jugador durante el partido */}
+                  {cond.superSub &&
+                    bet.status === 'LIVE' &&
+                    !isVoid &&
+                    !isMet &&
+                    !isBusted && (
+                      <button
+                        onClick={() => openSwapDialog(cond)}
+                        aria-label={`Super Sub: cambiar jugador en ${cond.selection}`}
+                        title='Super Sub: el suplente que entró hereda esta línea'
+                        className='flex h-7 w-7 items-center justify-center rounded-sm border border-white/10 text-slate-400 transition-colors duration-150 hover:border-brand/50 hover:text-brand'
+                      >
+                        <Repeat className='h-3.5 w-3.5' />
+                      </button>
+                    )}
 
                   {typeof cond.currentValue === 'number' &&
                     bet.status === 'LIVE' &&
+                    !isVoid &&
                     !isMet &&
                     !isBusted && (
                       <div className='flex items-center gap-1 rounded-md border border-white/10 bg-black/40 p-0.5'>
@@ -373,7 +509,9 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                     ? XCircle
                     : c.status === 'CLUTCH_DANGER'
                       ? Flame
-                      : Clock;
+                      : c.status === 'VOID'
+                        ? Ban
+                        : Clock;
               return (
                 <Icon
                   key={c.id}
@@ -384,7 +522,9 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                         ? 'text-red-400'
                         : c.status === 'CLUTCH_DANGER'
                           ? 'fill-current text-amber-400'
-                          : 'text-slate-500'
+                          : c.status === 'VOID'
+                            ? 'text-slate-600'
+                            : 'text-slate-500'
                   }`}
                 />
               );
@@ -432,8 +572,168 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
           </button>
         )}
       </div>
+
+      {/* Diálogo: suspensión del partido */}
+      <SuspendDialog
+        isOpen={showSuspendDialog}
+        bet={bet}
+        onClose={() => setShowSuspendDialog(false)}
+        onVoidConditions={(ids) => voidConditions(bet.id, ids)}
+        onVoidBet={() => settleBet(bet.id, 'VOID')}
+      />
+
+      {/* Diálogo: Super Sub (cambio de jugador) */}
+      <Modal
+        isOpen={swapConditionId !== null}
+        onClose={() => setSwapConditionId(null)}
+        ariaLabel='Super Sub: cambio de jugador'
+        maxWidthClass='max-w-md'
+      >
+        <h2 className='mb-1 text-sm font-semibold text-white'>
+          Super Sub — cambio de jugador
+        </h2>
+        <p className='mb-4 text-xs text-slate-400'>
+          El suplente que entró hereda la línea con la misma cuota. Editá el
+          nombre en la selección.
+        </p>
+        {swapCondition?.supersubFrom && (
+          <p className='mb-3 rounded-md border border-white/10 bg-panel px-3 py-2 text-xs text-slate-400'>
+            Heredó de:{' '}
+            <span className='text-slate-200'>{swapCondition.supersubFrom}</span>
+          </p>
+        )}
+        <label className='mb-1 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
+          Selección con el suplente
+        </label>
+        <input
+          type='text'
+          value={swapText}
+          onChange={(e) => setSwapText(e.target.value)}
+          autoFocus
+          className='w-full rounded-md border border-white/10 bg-base px-3 py-2 text-sm text-white transition-colors focus:border-brand focus:outline-none'
+        />
+        <div className='mt-5 flex justify-end gap-2 border-t border-white/10 pt-4'>
+          <Button variant='ghost' onClick={() => setSwapConditionId(null)}>
+            Cancelar
+          </Button>
+          <Button
+            variant='primary'
+            disabled={
+              !swapText.trim() || swapText.trim() === swapCondition?.selection
+            }
+            onClick={() => {
+              if (swapConditionId && swapText.trim()) {
+                swapPlayer(bet.id, swapConditionId, swapText.trim());
+              }
+              setSwapConditionId(null);
+            }}
+          >
+            Confirmar cambio
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }
 
 export const BetCard = memo(BetCardComponent);
+
+/** Diálogo de anulación por suspensión: por condición (cuota 1.0) o total. */
+const SuspendDialog: React.FC<{
+  isOpen: boolean;
+  bet: Bet;
+  onClose: () => void;
+  onVoidConditions: (ids: string[]) => void;
+  onVoidBet: () => void;
+}> = ({ isOpen, bet, onClose, onVoidConditions, onVoidBet }) => {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const voidable = bet.conditions.filter((c) => c.status !== 'VOID');
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const close = () => {
+    setSelected(new Set());
+    onClose();
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={close}
+      ariaLabel='Suspensión del partido'
+      maxWidthClass='max-w-md'
+    >
+      <h2 className='mb-1 text-sm font-semibold text-white'>
+        Suspensión del partido
+      </h2>
+      <p className='mb-4 text-xs text-slate-400'>
+        Si el partido no se reanuda en 24-48hs (según tu casa), las selecciones
+        afectadas se anulan: aportan cuota 1.0 y el resto del ticket sigue
+        válido.
+      </p>
+
+      <div className='mb-4 space-y-1.5'>
+        {voidable.map((cond) => (
+          <button
+            key={cond.id}
+            type='button'
+            role='checkbox'
+            aria-checked={selected.has(cond.id)}
+            onClick={() => toggle(cond.id)}
+            className={`flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+              selected.has(cond.id)
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
+                : 'border-white/10 bg-panel text-slate-300 hover:border-white/25'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${
+                selected.has(cond.id)
+                  ? 'border-amber-400 bg-amber-400 text-black'
+                  : 'border-white/25'
+              }`}
+            >
+              {selected.has(cond.id) && <CheckCircle2 className='h-3 w-3' />}
+            </span>
+            <span className='truncate'>{cond.selection}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className='flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end'>
+        <Button variant='ghost' onClick={close}>
+          Esperar reanudación
+        </Button>
+        <Button
+          variant='secondary'
+          disabled={selected.size === 0}
+          onClick={() => {
+            onVoidConditions([...selected]);
+            close();
+          }}
+        >
+          Anular selección ({selected.size})
+        </Button>
+        <Button
+          variant='danger'
+          onClick={() => {
+            onVoidBet();
+            close();
+          }}
+        >
+          Anular toda la apuesta
+        </Button>
+      </div>
+    </Modal>
+  );
+};

@@ -39,6 +39,9 @@ const NotesView = lazy(() =>
     default: m.NotesView,
   })),
 );
+const LiveResults = lazy(() =>
+  import('./components/LiveResults').then((m) => ({ default: m.LiveResults })),
+);
 
 export type AppView = 'dashboard' | 'notes';
 
@@ -122,6 +125,11 @@ const DashboardContent: React.FC = () => {
           <>
             {/* Compact 3-Stat Strip */}
             <StatsOverview />
+
+            {/* Resultados en vivo de los partidos con apuestas activas */}
+            <Suspense fallback={null}>
+              <LiveResults />
+            </Suspense>
 
             <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4'>
               {/* Main Bet Feed Column */}

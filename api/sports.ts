@@ -27,6 +27,32 @@ function getApiKey(): string | null {
   return key && key.trim() !== '' ? key.trim() : null;
 }
 
+// ---- Guardian de cuota diaria para API-Football ----------------------------
+const DAILY_QUOTA_LIMIT = 80;
+let quotaDate = '';
+let quotaCount = 0;
+
+function quotaAvailable(): boolean {
+  const today = new Date().toISOString().slice(0, 10);
+  if (quotaDate !== today) {
+    quotaDate = today;
+    quotaCount = 0;
+  }
+  return quotaCount < DAILY_QUOTA_LIMIT;
+}
+
+function consumeQuota(): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (quotaDate !== today) {
+    quotaDate = today;
+    quotaCount = 0;
+  }
+  quotaCount += 1;
+  console.warn(
+    `[api/sports] cuota API-Football: ${quotaCount}/${DAILY_QUOTA_LIMIT} hoy`,
+  );
+}
+
 async function cachedUpstreamFetch(
   path: string,
   ttlMs: number,
@@ -36,6 +62,10 @@ async function cachedUpstreamFetch(
   if (hit && now - hit.ts < ttlMs) {
     return hit.data;
   }
+  if (!quotaAvailable()) {
+    throw new Error('Cuota diaria de API-Football agotada');
+  }
+  consumeQuota();
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: { 'x-apisports-key': getApiKey() ?? '' },
@@ -50,6 +80,96 @@ async function cachedUpstreamFetch(
     if (oldest !== undefined) cache.delete(oldest);
   }
   return json;
+}
+
+interface TeamSuggestionRow {
+  id: number;
+  name: string;
+  country: string;
+}
+
+/** Búsqueda de equipos en SofaScore (gratuita). */
+async function searchSofaTeams(term: string): Promise<TeamSuggestionRow[]> {
+  const res = await fetch(
+    `https://api.sofascore.com/api/v1/search/team/all?q=${encodeURIComponent(term)}&page=0`,
+    { headers: { 'User-Agent': 'lafija/1.0' } },
+  );
+  if (!res.ok) throw new Error(`SofaScore HTTP ${res.status}`);
+  const json = (await res.json()) as {
+    results?: Array<{
+      entity?: {
+        id?: number;
+        name?: string;
+        country?: { name?: string };
+        sport?: { slug?: string };
+      };
+    }>;
+  };
+
+  return (json.results ?? [])
+    .map((r) => r.entity)
+    .filter(
+      (
+        e,
+      ): e is {
+        id: number;
+        name: string;
+        country?: { name?: string };
+        sport?: { slug?: string };
+      } =>
+        typeof e?.id === 'number' &&
+        typeof e?.name === 'string' &&
+        (!e.sport?.slug || e.sport.slug === 'football'),
+    )
+    .slice(0, 8)
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      country: e.country?.name ?? '',
+    }));
+}
+
+/** Búsqueda de equipos en API-Football (fallback con guardián de cuota). */
+async function searchApiFootballTeams(
+  term: string,
+): Promise<TeamSuggestionRow[]> {
+  const json = (await cachedUpstreamFetch(
+    `/teams?search=${encodeURIComponent(term)}`,
+    24 * 60 * 60 * 1000,
+  )) as {
+    response?: Array<{
+      team?: { id?: number; name?: string; country?: string };
+    }>;
+  };
+
+  return (json.response ?? [])
+    .filter((r) => r.team?.id && r.team?.name)
+    .slice(0, 8)
+    .map((r) => ({
+      id: r.team?.id ?? 0,
+      name: r.team?.name ?? '',
+      country: r.team?.country ?? '',
+    }));
+}
+
+/** Autocomplete de equipos: SofaScore primero, API-Football como fallback. */
+async function handleTeamsSearch(
+  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  search: string,
+): Promise<void> {
+  try {
+    const teams = await searchSofaTeams(search);
+    if (teams.length > 0) {
+      sendJson(res, 200, { teams, source: 'sofascore' });
+      return;
+    }
+  } catch (err) {
+    console.warn('[api/sports] búsqueda SofaScore fallo:', err);
+  }
+
+  // Fallback a API-Football (cachedUpstreamFetch aplica el guardián de cuota)
+  const teams = await searchApiFootballTeams(search);
+  sendJson(res, 200, { teams, source: 'apifootball' });
 }
 
 function sendJson(
@@ -72,8 +192,8 @@ interface ApiFixture {
   };
   league?: { name?: string; country?: string };
   teams?: {
-    home?: { name?: string };
-    away?: { name?: string };
+    home?: { name?: string; id?: number };
+    away?: { name?: string; id?: number };
   };
   goals?: { home?: number | null; away?: number | null };
 }
@@ -94,6 +214,8 @@ async function handleLive(
     statusShort: f.fixture?.status?.short ?? 'NS',
     homeTeam: f.teams?.home?.name ?? '',
     awayTeam: f.teams?.away?.name ?? '',
+    homeTeamId: f.teams?.home?.id ?? 0,
+    awayTeamId: f.teams?.away?.id ?? 0,
     homeScore: f.goals?.home ?? 0,
     awayScore: f.goals?.away ?? 0,
     startTime: f.fixture?.date ?? '',
@@ -175,6 +297,18 @@ export default async function handler(
   try {
     const query = req.query ?? {};
     const fixtureParam = query.fixture;
+    const teamsSearch = query.teamsSearch;
+
+    // ?teamsSearch=xxx -> autocomplete de equipos (cache 24h)
+    if (teamsSearch !== undefined) {
+      const term = (Array.isArray(teamsSearch) ? teamsSearch[0] : teamsSearch)?.trim() ?? '';
+      if (term.length < 3) {
+        sendJson(res, 200, { teams: [] });
+        return;
+      }
+      await handleTeamsSearch(res, term);
+      return;
+    }
 
     // ?fixture=123 -> estadisticas del partido
     if (fixtureParam !== undefined) {

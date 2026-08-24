@@ -53,6 +53,8 @@ export function tickLiveBets(prevBets: Bet[]): SimulationResult {
     const matchTitle = `${bet.match.homeTeam} vs ${bet.match.awayTeam}`;
 
     const updatedConditions = bet.conditions.map((cond): BetCondition => {
+      // Anuladas por suspensión: quedan congeladas (aportan cuota 1.0)
+      if (cond.status === 'VOID') return cond;
       if (cond.isLock || cond.status === 'MET') return cond;
 
       if (isNumericCondition(cond)) {
