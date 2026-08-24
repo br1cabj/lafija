@@ -1,13 +1,18 @@
 import React from 'react';
 import { useBets } from '../context/BetContext';
-import { LayoutGrid, Radio, Plus, TrendingUp, Zap } from 'lucide-react';
+import type { AppView } from '../App';
+import { LayoutGrid, Radio, Plus, TrendingUp, Zap, NotebookPen } from 'lucide-react';
 
 interface MobileNavProps {
+  view: AppView;
+  onChangeView: (view: AppView) => void;
   onOpenAddModal: () => void;
   onOpenAnalyticsModal: () => void;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
+  view,
+  onChangeView,
   onOpenAddModal,
   onOpenAnalyticsModal,
 }) => {
@@ -18,15 +23,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   return (
     <nav
       aria-label='Navegación móvil'
-      className='md:hidden fixed bottom-0 left-0 right-0 z-40 bg-base/95 backdrop-blur-lg border-t border-white/10 px-3 py-2 flex items-center justify-around'
+      className='md:hidden fixed bottom-0 left-0 right-0 z-40 bg-base/95 backdrop-blur-lg border-t border-white/10 px-2 py-2 flex items-center justify-around'
     >
       {/* Tab 1: Dashboard / Todas */}
       <button
-        onClick={() => setFilter('ALL')}
+        onClick={() => {
+          onChangeView('dashboard');
+          setFilter('ALL');
+        }}
         aria-label='Ver todas las apuestas'
-        aria-current={filter === 'ALL' ? 'page' : undefined}
+        aria-current={view === 'dashboard' && filter === 'ALL' ? 'page' : undefined}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
-          filter === 'ALL' ? 'text-brand' : 'text-slate-400'
+          view === 'dashboard' && filter === 'ALL'
+            ? 'text-brand'
+            : 'text-slate-400'
         }`}
       >
         <LayoutGrid className='w-5 h-5' />
@@ -35,11 +45,16 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 
       {/* Tab 2: En Vivo */}
       <button
-        onClick={() => setFilter('LIVE')}
+        onClick={() => {
+          onChangeView('dashboard');
+          setFilter('LIVE');
+        }}
         aria-label={`Apuestas en vivo (${liveCount})`}
-        aria-current={filter === 'LIVE' ? 'page' : undefined}
+        aria-current={view === 'dashboard' && filter === 'LIVE' ? 'page' : undefined}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold relative transition-colors ${
-          filter === 'LIVE' ? 'text-brand' : 'text-slate-400'
+          view === 'dashboard' && filter === 'LIVE'
+            ? 'text-brand'
+            : 'text-slate-400'
         }`}
       >
         <div className='relative'>
@@ -64,7 +79,20 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         <Plus className='w-6 h-6 stroke-[3]' />
       </button>
 
-      {/* Tab 3: Métricas */}
+      {/* Tab 3: Notas (Diario) */}
+      <button
+        onClick={() => onChangeView('notes')}
+        aria-label='Abrir diario de notas'
+        aria-current={view === 'notes' ? 'page' : undefined}
+        className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
+          view === 'notes' ? 'text-brand' : 'text-slate-400'
+        }`}
+      >
+        <NotebookPen className='w-5 h-5' />
+        <span>Notas</span>
+      </button>
+
+      {/* Tab 4: Métricas */}
       <button
         onClick={onOpenAnalyticsModal}
         aria-label='Ver métricas'
@@ -74,7 +102,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         <span>Métricas</span>
       </button>
 
-      {/* Tab 4: Simulador */}
+      {/* Tab 5: Simulador */}
       <button
         onClick={toggleSimulation}
         aria-label={
@@ -88,7 +116,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         <Zap
           className={`w-5 h-5 ${isSimulating ? 'text-emerald-400 fill-emerald-400 animate-bounce' : ''}`}
         />
-        <span>{isSimulating ? 'Sim: ON' : 'Sim: OFF'}</span>
+        <span>{isSimulating ? 'ON' : 'OFF'}</span>
       </button>
     </nav>
   );

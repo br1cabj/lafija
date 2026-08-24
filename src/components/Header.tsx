@@ -14,14 +14,17 @@ import {
   Shield,
   Volume2,
   VolumeX,
-  RotateCcw,
   Trash2,
   DollarSign,
+  NotebookPen,
 } from 'lucide-react';
+import type { AppView } from '../App';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
   onOpenAnalyticsModal: () => void;
+  onOpenNotes: () => void;
+  activeView: AppView;
 }
 
 type HeaderDialog = 'bankroll' | 'clear' | null;
@@ -29,6 +32,8 @@ type HeaderDialog = 'bankroll' | 'clear' | null;
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddModal,
   onOpenAnalyticsModal,
+  onOpenNotes,
+  activeView,
 }) => {
   const {
     stats,
@@ -42,7 +47,6 @@ export const Header: React.FC<HeaderProps> = ({
     setCurrency,
     currencySymbol,
     clearAllBets,
-    restoreDemoBets,
   } = useBets();
   const { user, openAuthModal, signOut } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -83,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
               LA<span className='text-brand'>FIJA</span>
             </h1>
             <span className='text-[10px] font-mono text-slate-400'>
-              LVL {stats.faceitLevel} • {stats.winRate}% WIN
+              LVL {stats.rankLevel} • {stats.winRate}% WIN
             </span>
           </div>
         </div>
@@ -133,6 +137,20 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <VolumeX className='w-4 h-4' />
             )}
+          </button>
+
+          {/* Notes / Diario button */}
+          <button
+            onClick={onOpenNotes}
+            aria-label='Diario de notas'
+            aria-current={activeView === 'notes' ? 'page' : undefined}
+            className={`p-1.5 rounded border transition-colors ${
+              activeView === 'notes'
+                ? 'bg-orange-500/20 border-brand/50 text-brand'
+                : 'bg-panel border-white/10 text-slate-300 hover:text-white'
+            }`}
+          >
+            <NotebookPen className='w-4 h-4' />
           </button>
 
           {/* Analytics button */}
@@ -212,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <div className='mt-1 flex items-center gap-1 text-[10px] text-orange-400 font-mono'>
                     <Shield className='w-3 h-3' />
                     <span>
-                      ELO {stats.eloRating} PTS • LVL {stats.faceitLevel}
+                      ELO {stats.eloRating} PTS • LVL {stats.rankLevel}
                     </span>
                   </div>
                 </div>
@@ -241,16 +259,6 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <Trash2 className='w-3.5 h-3.5 text-brand' />
                     <span>Vaciar datos / Empezar en blanco</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      restoreDemoBets();
-                      setShowProfileMenu(false);
-                    }}
-                    className='w-full text-left px-3 py-1.5 text-slate-300 hover:bg-white/5 flex items-center gap-2 transition-colors text-[11px]'
-                  >
-                    <RotateCcw className='w-3.5 h-3.5 text-emerald-400' />
-                    <span>Restaurar apuestas de demo</span>
                   </button>
                 </div>
 

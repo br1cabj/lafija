@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BetProvider, useBets } from './context/BetContext';
 import { AuthProvider } from './context/AuthContext';
+import { NotesProvider } from './context/NotesContext';
 import { Header } from './components/Header';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { StatsOverview } from './components/StatsOverview';
@@ -12,11 +13,15 @@ import { AuthModal } from './components/AuthModal';
 import { ShareTicketModal } from './components/ShareTicketModal';
 import { MobileNav } from './components/MobileNav';
 import { LiveFeedSidebar } from './components/LiveFeedSidebar';
+import { NotesView } from './components/notes/NotesView';
 import type { Bet } from './types/bet';
 import { Plus, ShieldCheck, Zap } from 'lucide-react';
 
+export type AppView = 'dashboard' | 'notes';
+
 const DashboardContent: React.FC = () => {
   const { bets, filter, searchQuery } = useBets();
+  const [view, setView] = useState<AppView>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [selectedBetForShare, setSelectedBetForShare] = useState<Bet | null>(
@@ -67,72 +72,81 @@ const DashboardContent: React.FC = () => {
       {/* PWA Mobile Install Prompt */}
       <PWAInstallBanner />
 
-      {/* Main FACEIT Header */}
+      {/* Main Header */}
       <Header
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
+        onOpenNotes={() => setView('notes')}
+        activeView={view}
       />
 
       {/* Main Container */}
       <main className='max-w-5xl mx-auto px-4 py-4'>
-        {/* Compact 3-Stat Strip */}
-        <StatsOverview />
+        {view === 'notes' ? (
+          <NotesView />
+        ) : (
+          <>
+            {/* Compact 3-Stat Strip */}
+            <StatsOverview />
 
-        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4'>
-          {/* Main Bet Feed Column */}
-          <div className='lg:col-span-2 space-y-3'>
-            {/* Minimal Filters */}
-            <FilterBar />
+            <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mt-4'>
+              {/* Main Bet Feed Column */}
+              <div className='lg:col-span-2 space-y-3'>
+                {/* Minimal Filters */}
+                <FilterBar />
 
-            <div className='flex items-center justify-between mb-2'>
-              <span className='text-xs font-mono text-slate-400'>
-                {filteredBets.length}{' '}
-                {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
-              </span>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-xs font-mono text-slate-400'>
+                    {filteredBets.length}{' '}
+                    {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
+                  </span>
 
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className='text-xs font-mono font-bold text-brand hover:text-orange-400 flex items-center gap-1'
-              >
-                <Plus className='w-3.5 h-3.5' />
-                <span>Nueva Apuesta</span>
-              </button>
-            </div>
-
-            {filteredBets.length === 0 ? (
-              <div className='bg-surface border border-dashed border-white/10 rounded-lg p-8 text-center'>
-                <div className='w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5'>
-                  <Zap className='w-5 h-5' />
+                  <button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className='text-xs font-mono font-bold text-brand hover:text-orange-400 flex items-center gap-1'
+                  >
+                    <Plus className='w-3.5 h-3.5' />
+                    <span>Nueva Apuesta</span>
+                  </button>
                 </div>
-                <h3 className='text-sm font-bold text-white mb-1'>
-                  No hay apuestas en esta vista
-                </h3>
-                <p className='text-xs text-slate-400 mb-3'>
-                  Añade una nueva apuesta para iniciar el seguimiento en vivo.
-                </p>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className='px-3.5 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase rounded shadow'
-                >
-                  + Crear Apuesta
-                </button>
-              </div>
-            ) : (
-              filteredBets.map((bet) => (
-                <BetCard
-                  key={bet.id}
-                  bet={bet}
-                  onShare={(targetBet) => setSelectedBetForShare(targetBet)}
-                />
-              ))
-            )}
-          </div>
 
-          {/* Desktop Right Sidebar */}
-          <div className='hidden lg:block lg:col-span-1'>
-            <LiveFeedSidebar />
-          </div>
-        </div>
+                {filteredBets.length === 0 ? (
+                  <div className='bg-surface border border-dashed border-white/10 rounded-lg p-8 text-center'>
+                    <div className='w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5'>
+                      <Zap className='w-5 h-5' />
+                    </div>
+                    <h3 className='text-sm font-bold text-white mb-1'>
+                      No hay apuestas en esta vista
+                    </h3>
+                    <p className='text-xs text-slate-400 mb-3'>
+                      Añade una nueva apuesta para iniciar el seguimiento en
+                      vivo.
+                    </p>
+                    <button
+                      onClick={() => setIsAddModalOpen(true)}
+                      className='px-3.5 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase rounded shadow'
+                    >
+                      + Crear Apuesta
+                    </button>
+                  </div>
+                ) : (
+                  filteredBets.map((bet) => (
+                    <BetCard
+                      key={bet.id}
+                      bet={bet}
+                      onShare={(targetBet) => setSelectedBetForShare(targetBet)}
+                    />
+                  ))
+                )}
+              </div>
+
+              {/* Desktop Right Sidebar */}
+              <div className='hidden lg:block lg:col-span-1'>
+                <LiveFeedSidebar />
+              </div>
+            </div>
+          </>
+        )}
       </main>
 
       {/* Modals - AddBetModal se monta fresco en cada apertura */}
@@ -155,6 +169,8 @@ const DashboardContent: React.FC = () => {
 
       {/* Mobile Bottom HUD Nav */}
       <MobileNav
+        view={view}
+        onChangeView={setView}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
       />
@@ -184,7 +200,9 @@ function App() {
   return (
     <AuthProvider>
       <BetProvider>
-        <DashboardContent />
+        <NotesProvider>
+          <DashboardContent />
+        </NotesProvider>
       </BetProvider>
     </AuthProvider>
   );
