@@ -36,6 +36,7 @@ import {
 import {
   API_MARKET_LABELS,
   detectApiCategory,
+  normalizeName,
 } from '../utils/liveSync';
 
 interface BetCardProps {
@@ -80,6 +81,16 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
       ? Math.round((metConditions / totalConditions) * 100)
       : 0;
   const hasVoidedConditions = bet.conditions.some((c) => c.status === 'VOID');
+
+  // Partidos extra del builder multi-partido (patas con match propio)
+  const extraMatches = new Set(
+    bet.conditions
+      .filter((c) => c.match)
+      .map(
+        (c) =>
+          normalizeName(`${c.match!.homeTeam} ${c.match!.awayTeam}`),
+      ),
+  ).size;
   const effOdds = hasVoidedConditions ? effectiveOdds(bet) : bet.odds;
   const effPayout = bet.stake * effOdds;
 
@@ -323,6 +334,17 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
           )}
           <span className='text-xs font-normal text-slate-500'>vs</span>
           <span>{bet.match.awayTeam}</span>
+          {extraMatches > 0 && (
+            <span
+              title={bet.conditions
+                .filter((c) => c.match)
+                .map((c) => `${c.match!.homeTeam} vs ${c.match!.awayTeam}`)
+                .join(' · ')}
+              className='rounded-sm border border-white/10 bg-base px-1.5 py-0.5 text-[10px] font-bold text-sky-300'
+            >
+              +{extraMatches} partido{extraMatches > 1 ? 's' : ''}
+            </span>
+          )}
         </h3>
       </button>
 

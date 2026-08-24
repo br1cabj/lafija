@@ -39,6 +39,19 @@ export interface BetCondition {
   superSub?: boolean;
   /** Jugador original del que heredó la línea (tras un cambio Super Sub). */
   supersubFrom?: string;
+  /**
+   * Partido de esta pata en builders multi-partido. Opcional: si falta,
+   * la pata pertenece al partido principal de la apuesta.
+   */
+  match?: ConditionMatch;
+}
+
+/** Referencia mínima al partido de una pata (builders multi-partido). */
+export interface ConditionMatch {
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamId?: number;
+  awayTeamId?: number;
 }
 
 export interface MatchInfo {

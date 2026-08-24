@@ -533,6 +533,56 @@ test('applyLiveUpdate evalua cada pata con SU propio marcador', () => {
   assert(y?.status !== 'MET', 'primary 0-0 no debe marcar');
 });
 
+test('pata con match declarado usa matching EXACTO aunque el texto no mencione equipos', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({
+        id: 'm',
+        market: 'Tarjetas',
+        selection: 'Más de 3.5 tarjetas',
+        targetValue: 4,
+      }),
+    ],
+  });
+  // La pata declara sus equipos (nuevo flujo del formulario multi-partido)
+  (b.conditions[0] as BetCondition).match = {
+    homeTeam: 'Flamengo',
+    awayTeam: 'Palmeiras',
+  };
+  const links = findFixturesForBet(b, [fA, fB]);
+  assert(links.byCondition.get('m') === fB, 'match declarado -> fixture Flamengo');
+});
+
+test('sanitizeBets repara/rechaza match podrido de una pata', () => {
+  const raw = [
+    {
+      id: 'b1', title: 'T', sport: 'football', league: 'L', type: 'parlay',
+      match: { homeTeam: 'A', awayTeam: 'B', status: 'LIVE' },
+      stake: 10, odds: 2, potentialPayout: 20, bookmaker: 'X',
+      status: 'LIVE', createdAt: new Date().toISOString(), tags: [],
+      conditions: [
+        {
+          id: 'c1', market: 'Goles', selection: '+1.5', targetValue: 2,
+          currentValue: 0, progress: 0, status: 'IN_PROGRESS', isLock: false,
+          match: { homeTeam: 'F'.repeat(500), awayTeam: 'Palmeiras', homeTeamId: 'x' },
+        },
+        {
+          id: 'c2', market: 'Goles', selection: '+0.5', targetValue: 1,
+          currentValue: 0, progress: 0, status: 'IN_PROGRESS', isLock: false,
+          match: null,
+        },
+      ],
+    },
+  ];
+  const [b] = sanitizeBets(raw);
+  const c1 = b!.conditions[0];
+  assert(c1.match?.homeTeam.length === 100, 'homeTeam truncado a 100');
+  assert(c1.match?.awayTeam === 'Palmeiras', 'awayTeam conservado');
+  assert(c1.match?.homeTeamId === undefined, 'id basura descartado');
+  assert(b!.conditions[1].match === undefined, 'match null -> undefined');
+});
+
 // ---- 7. cashout y deltas manuales ---------------------------------------------
 
 console.log('\n[7] simulación y cashout');

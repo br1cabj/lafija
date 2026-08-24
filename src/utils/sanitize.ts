@@ -91,6 +91,28 @@ function sanitizeCondition(raw: unknown): BetCondition | null {
     superSub: c.superSub === true,
     supersubFrom:
       typeof c.supersubFrom === 'string' ? c.supersubFrom : undefined,
+    match: sanitizeConditionMatch(c.match),
+  };
+}
+
+/** Partido de una pata (builders multi-partido); undefined si es basura. */
+function sanitizeConditionMatch(raw: unknown): BetCondition['match'] {
+  if (typeof raw !== 'object' || raw === null) return undefined;
+  const m = raw as Record<string, unknown>;
+  const home = safeString(m.homeTeam).slice(0, 100);
+  const away = safeString(m.awayTeam).slice(0, 100);
+  if (!home && !away) return undefined;
+  return {
+    homeTeam: home,
+    awayTeam: away,
+    homeTeamId:
+      typeof m.homeTeamId === 'number' && Number.isFinite(m.homeTeamId)
+        ? m.homeTeamId
+        : undefined,
+    awayTeamId:
+      typeof m.awayTeamId === 'number' && Number.isFinite(m.awayTeamId)
+        ? m.awayTeamId
+        : undefined,
   };
 }
 

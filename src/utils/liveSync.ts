@@ -106,6 +106,21 @@ export function findFixturesForBet(
   const primary = findFixtureForBet(bet, fixtures);
   const byCondition = new Map<string, LiveFixture>();
   for (const cond of bet.conditions) {
+    // 1. Matching EXACTO: la pata declara sus equipos (builder multi-partido)
+    if (cond.match?.homeTeam && cond.match?.awayTeam) {
+      const declared = fixtures.find(
+        (f) =>
+          (namesMatch(f.homeTeam, cond.match!.homeTeam) &&
+            namesMatch(f.awayTeam, cond.match!.awayTeam)) ||
+          (namesMatch(f.homeTeam, cond.match!.awayTeam) &&
+            namesMatch(f.awayTeam, cond.match!.homeTeam)),
+      );
+      if (declared && declared !== primary) {
+        byCondition.set(cond.id, declared);
+        continue;
+      }
+    }
+    // 2. Heurística por texto: menciona al equipo de otro partido
     const text = `${cond.market} ${cond.selection}`;
     const mentioned = fixtures.find(
       (f) => namesMatch(f.homeTeam, text) || namesMatch(f.awayTeam, text),

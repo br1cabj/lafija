@@ -4,6 +4,7 @@ import type {
   BetCondition,
   BetType,
   ConditionStatus,
+  ConditionMatch,
   SportType,
 } from '../types/bet';
 import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
@@ -27,7 +28,6 @@ import {
   Plus,
   Trash2,
   Zap,
-  Sparkles,
   Radio,
   Calendar,
   AlertCircle,
@@ -49,6 +49,27 @@ const EMPTY_CONDITION: Omit<BetCondition, 'id'> = {
   isLock: false,
 };
 
+/**
+ * Grupo de condiciones que comparten un mismo partido. En builders
+ * multi-partido cada grupo declara sus equipos para el tracking exacto.
+ */
+interface ConditionGroup {
+  key: number;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamId?: number;
+  awayTeamId?: number;
+  conditions: Omit<BetCondition, 'id'>[];
+}
+
+let groupKeySeq = 1;
+const newGroup = (): ConditionGroup => ({
+  key: groupKeySeq++,
+  homeTeam: '',
+  awayTeam: '',
+  conditions: [{ ...EMPTY_CONDITION }],
+});
+
 interface AddBetModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -63,10 +84,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const [matchStatus, setMatchStatus] = useState<'LIVE' | 'PENDING'>('LIVE');
   const [sport, setSport] = useState<SportType>('football');
   const [league, setLeague] = useState('');
-  const [homeTeam, setHomeTeam] = useState('');
-  const [awayTeam, setAwayTeam] = useState('');
-  const [homeTeamId, setHomeTeamId] = useState<number | undefined>(undefined);
-  const [awayTeamId, setAwayTeamId] = useState<number | undefined>(undefined);
   const [betType, setBetType] = useState<BetType>('bet_builder');
   const [stake, setStake] = useState('');
   const [inputOddsFormat, setInputOddsFormat] = useState<OddsFormat>(
@@ -76,21 +93,38 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const [bookmaker, setBookmaker] = useState('');
   const [bookmakerRegion, setBookmakerRegion] = useState<'AR' | 'GLOBAL'>('AR');
 
-  // Conditions list - arranca con una fila vacía
-  const [conditions, setConditions] = useState<Omit<BetCondition, 'id'>[]>([
-    { ...EMPTY_CONDITION },
-  ]);
-
+  // Grupos por partido; el primero es el partido principal de la boleta
+  const [groups, setGroups] = useState<ConditionGroup[]>([newGroup()]);
   // Nota: el form se monta fresco en cada apertura (App renderiza
   // condicionalmente el modal), por lo que no hace falta resetear estado.
 
-  const handleAddCondition = () => {
-    setConditions([...conditions, { ...EMPTY_CONDITION }]);
-  };
+  /** true si el tipo de apuesta admite más de un partido. */
+  const allowsMultipleMatches = betType !== 'single';
 
-  const handleRemoveCondition = (index: number) => {
-    setConditions(conditions.filter((_, i) => i !== index));
-  };
+  const handleAddGroup = () =>
+    setGroups((prev) => [...prev, newGroup()]);
+
+  const handleRemoveGroup = (gIdx: number) =>
+    setGroups((prev) => prev.filter((_, i) => i !== gIdx));
+
+  const handleTeamChange = (
+    gIdx: number,
+    side: 'home' | 'away',
+    name: string,
+    teamId?: number,
+  ) =>
+    setGroups((prev) =>
+      prev.map((g, i) =>
+        i === gIdx
+          ? {
+              ...g,
+              ...(side === 'home'
+                ? { homeTeam: name, homeTeamId: teamId }
+                : { awayTeam: name, awayTeamId: teamId }),
+            }
+          : g,
+      ),
+    );
 
   const recalcProgress = (
     cond: Omit<BetCondition, 'id'>,
@@ -111,36 +145,44 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     };
   };
 
+  const mutateConditions = (
+    gIdx: number,
+    fn: (conds: Omit<BetCondition, 'id'>[]) => Omit<BetCondition, 'id'>[],
+  ) =>
+    setGroups((prev) =>
+      prev.map((g, i) => (i === gIdx ? { ...g, conditions: fn(g.conditions) } : g)),
+    );
+
+  const handleAddCondition = (gIdx: number) =>
+    mutateConditions(gIdx, (cs) => [...cs, { ...EMPTY_CONDITION }]);
+
+  const handleRemoveCondition = (gIdx: number, cIdx: number) =>
+    mutateConditions(gIdx, (cs) => cs.filter((_, i) => i !== cIdx));
+
   const handleConditionChange = (
-    index: number,
+    gIdx: number,
+    cIdx: number,
     field: ConditionField,
     value: string | number,
-  ) => {
-    setConditions((prev) =>
-      prev.map((c, i) => {
-        if (i !== index) return c;
-        return recalcProgress({ ...c, [field]: value });
-      }),
+  ) =>
+    mutateConditions(gIdx, (cs) =>
+      cs.map((c, i) => (i === cIdx ? recalcProgress({ ...c, [field]: value }) : c)),
     );
-  };
 
-  const handleFormatChange = (newFormat: OddsFormat) => {
-    if (newFormat === inputOddsFormat) return;
-    const converted = convertOddsInput(oddsInput, inputOddsFormat, newFormat);
-    setInputOddsFormat(newFormat);
-    if (converted) {
-      setOddsInput(converted);
-    }
-  };
+  const toggleSuperSub = (gIdx: number, cIdx: number) =>
+    mutateConditions(gIdx, (cs) =>
+      cs.map((c, i) => (i === cIdx ? { ...c, superSub: !c.superSub } : c)),
+    );
 
   const addPreset = (
+    gIdx: number,
     market: string,
     selection: string,
     targetValue: number,
     unit: string,
-  ) => {
-    setConditions([
-      ...conditions,
+  ) =>
+    mutateConditions(gIdx, (cs) => [
+      ...cs,
       {
         market,
         selection,
@@ -152,6 +194,14 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         isLock: false,
       },
     ]);
+
+  const handleFormatChange = (newFormat: OddsFormat) => {
+    if (newFormat === inputOddsFormat) return;
+    const converted = convertOddsInput(oddsInput, inputOddsFormat, newFormat);
+    setInputOddsFormat(newFormat);
+    if (converted) {
+      setOddsInput(converted);
+    }
   };
 
   // Cap anti-basura: 1e9 evita Infinity en payout y null silencioso en la nube
@@ -185,30 +235,56 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
 
     const isLive = matchStatus === 'LIVE';
 
-    // Descartar filas que el usuario dejó completamente vacías
-    const filledConditions = conditions.filter(
-      (c) => c.selection.trim() !== '' || c.market.trim() !== '',
+    // Descartar grupos sin condiciones cargadas
+    const filledGroups = groups.filter((g) =>
+      g.conditions.some(
+        (c) => c.selection.trim() !== '' || c.market.trim() !== '',
+      ),
     );
-    if (filledConditions.length === 0) return;
+    if (filledGroups.length === 0) return;
 
-    const mappedConditions: BetCondition[] = filledConditions.map((c, i) => ({
-      ...c,
-      market: c.market.trim() || 'General',
-      selection: c.selection.trim(),
-      id: `cond-${Date.now()}-${i}`,
-      status: c.status === 'MET' ? 'MET' : isLive ? 'IN_PROGRESS' : 'PENDING',
-    }));
+    const multiMatch = filledGroups.length > 1;
+    const primary = filledGroups[0];
 
+    // Cada pata lleva la referencia a su partido (tracking exacto);
+    // con un solo grupo no hace falta (todo es el partido principal).
+    const matchOf = (g: ConditionGroup): ConditionMatch | undefined => {
+      if (!multiMatch) return undefined;
+      return {
+        homeTeam: g.homeTeam || 'Equipo Local',
+        awayTeam: g.awayTeam || 'Equipo Visitante',
+        homeTeamId: g.homeTeamId,
+        awayTeamId: g.awayTeamId,
+      };
+    };
+
+    let condSeq = 0;
+    const mappedConditions: BetCondition[] = filledGroups.flatMap((g, gi) => {
+      const ref = matchOf(g);
+      return g.conditions
+        .filter((c) => c.selection.trim() !== '' || c.market.trim() !== '')
+        .map((c) => ({
+          ...c,
+          market: c.market.trim() || 'General',
+          selection: c.selection.trim(),
+          id: `cond-${Date.now()}-${condSeq++}`,
+          status:
+            c.status === 'MET' ? 'MET' : isLive ? 'IN_PROGRESS' : 'PENDING',
+          ...(gi > 0 ? { match: ref } : {}),
+        }));
+    });
+
+    const moreMatches = multiMatch ? ` +${filledGroups.length - 1}` : '';
     addBet({
-      title: `${homeTeam || 'Equipo 1'} vs ${awayTeam || 'Equipo 2'} // ${betType.toUpperCase()}`,
+      title: `${primary.homeTeam || 'Equipo 1'} vs ${primary.awayTeam || 'Equipo 2'}${moreMatches} // ${betType.toUpperCase()}`,
       sport,
       league: league || 'Liga Principal',
       type: betType,
       match: {
-        homeTeam: homeTeam || 'Equipo Local',
-        awayTeam: awayTeam || 'Equipo Visitante',
-        homeTeamId,
-        awayTeamId,
+        homeTeam: primary.homeTeam || 'Equipo Local',
+        awayTeam: primary.awayTeam || 'Equipo Visitante',
+        homeTeamId: primary.homeTeamId,
+        awayTeamId: primary.awayTeamId,
         homeScore: isLive ? 0 : undefined,
         awayScore: isLive ? 0 : undefined,
         minute: isLive ? "01'" : undefined,
@@ -322,8 +398,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               onChange={(e) => setBetType(e.target.value as BetType)}
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             >
-              <option value='bet_builder'>Bet Builder (mismo partido)</option>
-              <option value='parlay'>Parlay / Combinada</option>
+              <option value='bet_builder'>Bet Builder / Combinada</option>
+              <option value='parlay'>Parlay (varios partidos)</option>
               <option value='single'>Simple (1 selección)</option>
             </select>
           </div>
@@ -341,31 +417,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               value={league}
               onChange={(e) => setLeague(e.target.value)}
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
-            />
-          </div>
-        </div>
-
-        {/* Teams / Event */}
-        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-          <TeamInput
-            id='abm-home'
-            label='Equipo Local / Jugador 1'
-            value={homeTeam}
-            onChange={(name, teamId) => {
-              setHomeTeam(name);
-              setHomeTeamId(teamId);
-            }}
-          />
-
-          <div>
-            <TeamInput
-              id='abm-away'
-              label='Equipo Visitante / Jugador 2'
-              value={awayTeam}
-              onChange={(name, teamId) => {
-                setAwayTeam(name);
-                setAwayTeamId(teamId);
-              }}
             />
           </div>
         </div>
@@ -548,238 +599,304 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
           </div>
         </div>
 
-        {/* Quick Presets for Conditions */}
-        <div>
-          <div className='flex items-center justify-between mb-1.5'>
-            <span className='text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1'>
-              <Sparkles className='w-3.5 h-3.5 text-orange-400' />
-              Presets Rápidos
-            </span>
-          </div>
-          <div className='flex gap-1.5 flex-wrap'>
-            <button
-              type='button'
-              onClick={() =>
-                addPreset('Goles Totales', '+2.5 Goles', 2.5, 'goles')
-              }
-              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-            >
-              +2.5 Goles
-            </button>
-            <button
-              type='button'
-              onClick={() =>
-                addPreset('Córners Totales', '+8.5 Córners', 8.5, 'córners')
-              }
-              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-            >
-              +8.5 Córners
-            </button>
-            <button
-              type='button'
-              onClick={() =>
-                addPreset(
-                  'Props de Jugador',
-                  'Jugador 1+ Tiro al arco',
-                  1,
-                  'tiros',
-                )
-              }
-              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-              title='Props de jugador: seguimiento manual con los botones + / -'
-            >
-              1+ Tiro a puerta (jugador)
-            </button>
-            <button
-              type='button'
-              onClick={() =>
-                addPreset('Tiros Totales', '+25.5 Tiros totales', 25.5, 'tiros')
-              }
-              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-            >
-              +25.5 Tiros Totales
-            </button>
-            <button
-              type='button'
-              onClick={() =>
-                addPreset(
-                  'Tiros a Puerta',
-                  'Jugador 1+ Tiro al arco',
-                  1,
-                  'tiros',
-                )
-              }
-              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-            >
-              1+ Tiro a puerta
-            </button>
-          </div>
-        </div>
-
-        {/* Conditions List */}
-        <div className='space-y-2.5'>
-          <div className='flex items-center justify-between'>
-            <span className='text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
-              Condiciones del Tracker ({conditions.length})
-            </span>
-            <button
-              type='button'
-              onClick={handleAddCondition}
-              className='flex items-center gap-1 text-xs font-mono font-bold text-brand hover:text-orange-400'
-            >
-              <Plus className='w-3.5 h-3.5' />
-              <span>Añadir Condición</span>
-            </button>
-          </div>
-
-          {conditions.map((c, idx) => {
-            const apiCategory = detectApiCategory(c.market, c.selection);
-            const auto = apiCategory !== null;
-            return (
+        {/* Grupos por partido: equipos + condiciones de cada uno */}
+        {groups.map((group, gIdx) => {
+          const groupLabel =
+            groups.length > 1 ? `Partido ${gIdx + 1}` : 'Partido';
+          return (
             <div
-              key={idx}
-              className='p-3 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
+              key={group.key}
+              className='rounded border border-white/10 bg-panel/40 p-3 space-y-3'
             >
-              <input
-                type='text'
-                aria-label={`Mercado condición ${idx + 1}`}
-                placeholder='Mercado'
-                value={c.market}
-                onChange={(e) =>
-                  handleConditionChange(idx, 'market', e.target.value)
-                }
-                className='bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white sm:w-1/3 focus:border-brand focus:outline-none'
-              />
-
-              <div className='sm:w-1/3 w-full'>
-                <input
-                  type='text'
-                  aria-label={`Selección condición ${idx + 1}`}
-                  placeholder='Selección'
-                  value={c.selection}
-                  onChange={(e) =>
-                    handleConditionChange(idx, 'selection', e.target.value)
-                  }
-                  className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
-                />
-                {/* Feedback en vivo: el sistema entiende tu condición? */}
-                {(c.market.trim() || c.selection.trim()) && (
-                  <span
-                    title={
-                      auto
-                        ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
-                        : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
-                    }
-                    className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
-                      auto
-                        ? 'bg-sky-500/15 text-sky-300'
-                        : 'bg-amber-500/10 text-amber-400/90'
-                    }`}
-                  >
-                    {auto ? `⚡ ${API_MARKET_LABELS[apiCategory]}` : '✋ MANUAL'}
-                  </span>
-                )}
-              </div>
-
-              <div className='flex items-center gap-1.5 sm:w-1/3 justify-end'>
-                <div className='flex items-center gap-1 text-xs font-mono'>
-                  <input
-                    type='number'
-                    step='0.5'
-                    min='0'
-                    aria-label='Valor actual'
-                    placeholder='Actual'
-                    value={c.currentValue}
-                    onChange={(e) =>
-                      handleConditionChange(
-                        idx,
-                        'currentValue',
-                        parseFloat(e.target.value) || 0,
-                      )
-                    }
-                    className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-white text-center font-mono-numbers'
-                  />
-                  <span>/</span>
-                  <input
-                    type='number'
-                    step='0.5'
-                    min='0.5'
-                    aria-label='Valor objetivo'
-                    placeholder='Meta'
-                    value={c.targetValue}
-                    onChange={(e) =>
-                      handleConditionChange(
-                        idx,
-                        'targetValue',
-                        parseFloat(e.target.value) || 1,
-                      )
-                    }
-                    className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold'
-                  />
-                  <input
-                    type='number'
-                    step='0.01'
-                    min='1'
-                    aria-label='Cuota de la selección (opcional)'
-                    title='Cuota individual — permite recalcular la apuesta si una condición se anula'
-                    placeholder='x'
-                    value={c.odds ?? ''}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const value =
-                        raw === '' ? undefined : parseFloat(raw) || undefined;
-                      setConditions((prev) =>
-                        prev.map((cond, i) =>
-                          i === idx
-                            ? recalcProgress({ ...cond, odds: value })
-                            : cond,
-                        ),
-                      );
-                    }}
-                    className='w-12 bg-panel border border-white/10 rounded px-1 py-1.5 text-xs text-slate-300 text-center font-mono-numbers'
-                  />
-                </div>
-
-                {/* Super Sub: la línea hereda al suplente si hay cambio */}
-                <button
-                  type='button'
-                  role='switch'
-                  aria-checked={Boolean(c.superSub)}
-                  aria-label='Super Sub: la línea hereda al suplente'
-                  title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
-                  onClick={() => {
-                    setConditions((prev) =>
-                      prev.map((cond, i) =>
-                        i === idx
-                          ? { ...cond, superSub: !cond.superSub }
-                          : cond,
-                      ),
-                    );
-                  }}
-                  className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
-                    c.superSub
-                      ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
-                      : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  SS
-                </button>
-
-                {conditions.length > 1 && (
+              <div className='flex items-center justify-between'>
+                <span className='text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
+                  {groupLabel}
+                </span>
+                {groups.length > 1 && (
                   <button
                     type='button'
-                    onClick={() => handleRemoveCondition(idx)}
-                    aria-label={`Eliminar condición ${idx + 1}`}
-                    className='p-1.5 text-slate-500 hover:text-red-400'
+                    onClick={() => handleRemoveGroup(gIdx)}
+                    aria-label={`Quitar ${groupLabel}`}
+                    className='p-1 text-slate-500 hover:text-red-400'
                   >
                     <Trash2 className='w-3.5 h-3.5' />
                   </button>
                 )}
               </div>
+
+              {/* Teams / Event */}
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                <TeamInput
+                  id={`abm-home-${gIdx}`}
+                  label='Equipo Local / Jugador 1'
+                  value={group.homeTeam}
+                  onChange={(name, teamId) =>
+                    handleTeamChange(gIdx, 'home', name, teamId)
+                  }
+                />
+
+                <TeamInput
+                  id={`abm-away-${gIdx}`}
+                  label='Equipo Visitante / Jugador 2'
+                  value={group.awayTeam}
+                  onChange={(name, teamId) =>
+                    handleTeamChange(gIdx, 'away', name, teamId)
+                  }
+                />
+              </div>
+
+              {/* Presets del partido */}
+              <div className='flex gap-1.5 flex-wrap'>
+                <button
+                  type='button'
+                  onClick={() =>
+                    addPreset(gIdx, 'Goles Totales', '+2.5 Goles', 2.5, 'goles')
+                  }
+                  className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
+                >
+                  +2.5 Goles
+                </button>
+                <button
+                  type='button'
+                  onClick={() =>
+                    addPreset(
+                      gIdx,
+                      'Córners Totales',
+                      '+8.5 Córners',
+                      8.5,
+                      'córners',
+                    )
+                  }
+                  className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
+                >
+                  +8.5 Córners
+                </button>
+                <button
+                  type='button'
+                  onClick={() =>
+                    addPreset(
+                      gIdx,
+                      'Props de Jugador',
+                      'Jugador 1+ Tiro al arco',
+                      1,
+                      'tiros',
+                    )
+                  }
+                  className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
+                  title='Props de jugador: seguimiento manual con los botones + / -'
+                >
+                  1+ Tiro a puerta (jugador)
+                </button>
+                <button
+                  type='button'
+                  onClick={() =>
+                    addPreset(
+                      gIdx,
+                      'Tiros Totales',
+                      '+25.5 Tiros totales',
+                      25.5,
+                      'tiros',
+                    )
+                  }
+                  className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
+                >
+                  +25.5 Tiros Totales
+                </button>
+              </div>
+
+              {/* Condiciones del grupo */}
+              <div className='space-y-2'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-xs font-semibold text-slate-400 uppercase tracking-wider'>
+                    Condiciones ({group.conditions.length})
+                  </span>
+                  <button
+                    type='button'
+                    onClick={() => handleAddCondition(gIdx)}
+                    className='flex items-center gap-1 text-xs font-mono font-bold text-brand hover:text-orange-400'
+                  >
+                    <Plus className='w-3.5 h-3.5' />
+                    <span>Añadir</span>
+                  </button>
+                </div>
+
+                {group.conditions.map((c, cIdx) => {
+                  const apiCategory = detectApiCategory(c.market, c.selection);
+                  const auto = apiCategory !== null;
+                  return (
+                    <div
+                      key={cIdx}
+                      className='p-2.5 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
+                    >
+                      <input
+                        type='text'
+                        aria-label={`Mercado condición ${cIdx + 1} del ${groupLabel.toLowerCase()}`}
+                        placeholder='Mercado'
+                        value={c.market}
+                        onChange={(e) =>
+                          handleConditionChange(
+                            gIdx,
+                            cIdx,
+                            'market',
+                            e.target.value,
+                          )
+                        }
+                        className='bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white sm:w-1/3 focus:border-brand focus:outline-none'
+                      />
+
+                      <div className='sm:w-1/3 w-full'>
+                        <input
+                          type='text'
+                          aria-label={`Selección condición ${cIdx + 1} del ${groupLabel.toLowerCase()}`}
+                          placeholder='Selección'
+                          value={c.selection}
+                          onChange={(e) =>
+                            handleConditionChange(
+                              gIdx,
+                              cIdx,
+                              'selection',
+                              e.target.value,
+                            )
+                          }
+                          className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
+                        />
+                        {(c.market.trim() || c.selection.trim()) && (
+                          <span
+                            title={
+                              auto
+                                ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
+                                : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
+                            }
+                            className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
+                              auto
+                                ? 'bg-sky-500/15 text-sky-300'
+                                : 'bg-amber-500/10 text-amber-400/90'
+                            }`}
+                          >
+                            {auto
+                              ? `⚡ ${API_MARKET_LABELS[apiCategory]}`
+                              : '✋ MANUAL'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className='flex items-center gap-1.5 sm:w-1/3 justify-end'>
+                        <div className='flex items-center gap-1 text-xs font-mono'>
+                          <input
+                            type='number'
+                            step='0.5'
+                            min='0'
+                            aria-label='Valor actual'
+                            placeholder='Actual'
+                            value={c.currentValue}
+                            onChange={(e) =>
+                              handleConditionChange(
+                                gIdx,
+                                cIdx,
+                                'currentValue',
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
+                            className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-white text-center font-mono-numbers'
+                          />
+                          <span>/</span>
+                          <input
+                            type='number'
+                            step='0.5'
+                            min='0.5'
+                            aria-label='Valor objetivo'
+                            placeholder='Meta'
+                            value={c.targetValue}
+                            onChange={(e) =>
+                              handleConditionChange(
+                                gIdx,
+                                cIdx,
+                                'targetValue',
+                                parseFloat(e.target.value) || 1,
+                              )
+                            }
+                            className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold'
+                          />
+                          <input
+                            type='number'
+                            step='0.01'
+                            min='1'
+                            aria-label='Cuota de la selección (opcional)'
+                            title='Cuota individual — permite recalcular la apuesta si una condición se anula'
+                            placeholder='x'
+                            value={c.odds ?? ''}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const value =
+                                raw === ''
+                                  ? undefined
+                                  : parseFloat(raw) || undefined;
+                              mutateConditions(gIdx, (cs) =>
+                                cs.map((cond, i) =>
+                                  i === cIdx
+                                    ? recalcProgress({
+                                        ...cond,
+                                        odds: value,
+                                      })
+                                    : cond,
+                                ),
+                              );
+                            }}
+                            className='w-12 bg-panel border border-white/10 rounded px-1 py-1.5 text-xs text-slate-300 text-center font-mono-numbers'
+                          />
+                        </div>
+
+                        <button
+                          type='button'
+                          role='switch'
+                          aria-checked={Boolean(c.superSub)}
+                          aria-label='Super Sub: la línea hereda al suplente'
+                          title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
+                          onClick={() => toggleSuperSub(gIdx, cIdx)}
+                          className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                            c.superSub
+                              ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
+                              : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          SS
+                        </button>
+
+                        {group.conditions.length > 1 && (
+                          <button
+                            type='button'
+                            onClick={() =>
+                              handleRemoveCondition(gIdx, cIdx)
+                            }
+                            aria-label={`Eliminar condición ${cIdx + 1}`}
+                            className='p-1.5 text-slate-500 hover:text-red-400'
+                          >
+                            <Trash2 className='w-3.5 h-3.5' />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            );
-          })}
-        </div>
+          );
+        })}
+
+        {/* Agregar otro partido (combinadas y builders multi-partido) */}
+        {allowsMultipleMatches && (
+          <button
+            type='button'
+            onClick={handleAddGroup}
+            className='w-full flex items-center justify-center gap-1.5 py-2 rounded border border-dashed border-white/20 text-xs font-mono font-bold text-slate-400 hover:text-brand hover:border-brand/50 transition-colors'
+          >
+            <Plus className='w-4 h-4' />
+            Agregar otro partido
+            {groups.length > 1 && (
+              <span className='text-slate-600'>({groups.length})</span>
+            )}
+          </button>
+        )}
 
         {/* Submit Buttons */}
         <div className='flex items-center justify-end gap-3 pt-4 border-t border-white/10'>
