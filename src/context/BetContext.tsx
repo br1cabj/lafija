@@ -13,6 +13,12 @@ import type { OddsFormat } from '../utils/odds';
 import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
 import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
+import { findFixtureForBet, applyLiveUpdate } from '../utils/liveSync';
+import {
+  fetchLiveFixtures,
+  fetchFixtureStats,
+  type LiveFixtureStats,
+} from '../services/sportsApi';
 import { useAuth } from './AuthContext';
 import { canSyncToCloud } from '../services/supabase';
 import { fetchRemoteBets, syncBetsToCloud } from '../services/betsRepo';
@@ -48,6 +54,11 @@ interface BetContextType {
   currencySymbol: string;
   isSimulating: boolean;
   toggleSimulation: () => void;
+  /** Modo datos reales: sincroniza condiciones con partidos en vivo vía /api/sports. */
+  isRealMode: boolean;
+  toggleRealMode: () => void;
+  lastSyncAt: string | null;
+  syncLiveData: () => Promise<void>;
   liveLogs: LiveEventLog[];
   addBet: (betData: Omit<Bet, 'id' | 'createdAt'>) => void;
   deleteBet: (id: string) => void;
@@ -68,8 +79,11 @@ const STORAGE_KEY = 'lafija_bets_v1';
 const ODDS_FORMAT_KEY = 'lafija_odds_format_v1';
 const CURRENCY_KEY = 'lafija_currency_v1';
 const INITIAL_BANKROLL_KEY = 'lafija_initial_bankroll_v1';
+const REAL_MODE_KEY = 'lafija_real_mode_v1';
 /** Bankroll inicial hasta que el usuario configure el suyo. */
 const DEFAULT_INITIAL_BANKROLL = 0;
+/** Intervalo de sincronización con datos reales (ms). */
+const REAL_SYNC_INTERVAL_MS = 60_000;
 
 function readLocalStorage(key: string): string | null {
   try {
@@ -161,7 +175,16 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('ALL');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [isRealMode, setIsRealModeState] = useState<boolean>(
+    () => readLocalStorage(REAL_MODE_KEY) === 'true',
+  );
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [liveLogs, setLiveLogs] = useState<LiveEventLog[]>([]);
+
+  const setIsRealMode = (enabled: boolean) => {
+    setIsRealModeState(enabled);
+    writeLocalStorage(REAL_MODE_KEY, String(enabled));
+  };
 
   // Mirror ref so the simulation interval always reads fresh bets without
   // stale closures or side effects inside state updaters.
@@ -260,7 +283,99 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     return () => clearInterval(interval);
   }, [isSimulating]);
 
-  const toggleSimulation = () => setIsSimulating((prev) => !prev);
+  const toggleSimulation = () =>
+    setIsSimulating((prev) => {
+      // Exclusión mutua: simulador y datos reales no pueden correr a la vez
+      if (!prev) setIsRealMode(false);
+      return !prev;
+    });
+
+  // ---- Modo datos reales (polling de partidos en vivo vía /api/sports) ----
+
+  const realSyncingRef = useRef(false);
+
+  const syncLiveData = useCallback(async () => {
+    if (realSyncingRef.current) return;
+    const liveBets = betsRef.current.filter((b) => b.status === 'LIVE');
+    if (liveBets.length === 0) return;
+
+    realSyncingRef.current = true;
+    try {
+      const fixtures = await fetchLiveFixtures();
+      if (fixtures.length === 0) {
+        setLastSyncAt(new Date().toISOString());
+        return;
+      }
+
+      const statsCache = new Map<number, LiveFixtureStats | null>();
+      const updates: { bet: Bet; hits: string[]; title: string }[] = [];
+
+      for (const bet of liveBets) {
+        const fixture = findFixtureForBet(bet, fixtures);
+        if (!fixture || !fixture.fixtureId) continue;
+
+        let stats = statsCache.get(fixture.fixtureId);
+        if (stats === undefined) {
+          stats = await fetchFixtureStats(fixture.fixtureId);
+          statsCache.set(fixture.fixtureId, stats);
+        }
+
+        const result = applyLiveUpdate(bet, fixture, stats);
+        if (result.bet !== bet) {
+          updates.push({
+            bet: result.bet,
+            hits: result.newHits,
+            title: `${fixture.homeTeam} vs ${fixture.awayTeam}`,
+          });
+        }
+      }
+
+      if (updates.length > 0) {
+        const updateMap = new Map(updates.map((u) => [u.bet.id, u]));
+        setBets((prev) => prev.map((b) => updateMap.get(b.id)?.bet ?? b));
+
+        const logs: LiveEventLog[] = updates.flatMap((u) =>
+          u.hits.map((selection) => ({
+            id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            time: 'REAL',
+            betId: u.bet.id,
+            matchTitle: u.title,
+            text: `📡 ¡HIT en vivo! ${selection}`,
+            type: 'CUMPLIDO' as const,
+          })),
+        );
+        setLiveLogs((prevLogs) => [...logs, ...prevLogs].slice(0, 20));
+
+        if (updates.some((u) => u.hits.length > 0)) sounds.playHitSound();
+      }
+
+      setLastSyncAt(new Date().toISOString());
+    } catch (err) {
+      console.warn('Error sincronizando datos reales:', err);
+    } finally {
+      realSyncingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isRealMode) return;
+    // Primer sync diferido para no hacer setState en el cuerpo del efecto
+    const initial = setTimeout(() => void syncLiveData(), 0);
+    const interval = setInterval(() => void syncLiveData(), REAL_SYNC_INTERVAL_MS);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
+  }, [isRealMode, syncLiveData]);
+
+  const toggleRealMode = () =>
+    setIsRealModeState((prev) => {
+      const next = !prev;
+      writeLocalStorage(REAL_MODE_KEY, String(next));
+      // Exclusión mutua con el simulador
+      if (next) setIsSimulating(false);
+      return next;
+    });
 
   const pushLog = useCallback((log: LiveEventLog) => {
     setLiveLogs((logs) => [log, ...logs].slice(0, 20));
@@ -386,6 +501,10 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         currencySymbol,
         isSimulating,
         toggleSimulation,
+        isRealMode,
+        toggleRealMode,
+        lastSyncAt,
+        syncLiveData,
         liveLogs,
         addBet,
         deleteBet,

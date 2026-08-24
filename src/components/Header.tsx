@@ -17,6 +17,7 @@ import {
   Trash2,
   DollarSign,
   NotebookPen,
+  RadioTower,
 } from 'lucide-react';
 import type { AppView } from '../App';
 
@@ -47,6 +48,9 @@ export const Header: React.FC<HeaderProps> = ({
     setCurrency,
     currencySymbol,
     clearAllBets,
+    isRealMode,
+    toggleRealMode,
+    lastSyncAt,
   } = useBets();
   const { user, openAuthModal, signOut } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -100,6 +104,31 @@ export const Header: React.FC<HeaderProps> = ({
             value={oddsFormat}
             onChange={setOddsFormat}
           />
+
+          {/* Real Live Data Toggle */}
+          <button
+            onClick={toggleRealMode}
+            aria-label='Datos reales en vivo'
+            aria-pressed={isRealMode}
+            title={
+              isRealMode
+                ? `Datos reales activos${
+                    lastSyncAt
+                      ? ` • última sync ${new Date(lastSyncAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+                      : ''
+                  }`
+                : 'Sincronizar condiciones con partidos en vivo reales'
+            }
+            className={`p-1.5 rounded border transition-all ${
+              isRealMode
+                ? 'bg-cyan-950/60 border-cyan-500/50 text-cyan-400'
+                : 'bg-panel border-white/10 text-slate-400 hover:text-white'
+            }`}
+          >
+            <RadioTower
+              className={`w-4 h-4 ${isRealMode ? 'text-cyan-400 animate-pulse' : ''}`}
+            />
+          </button>
 
           {/* Quick Sim Toggle */}
           <button
