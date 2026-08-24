@@ -10,16 +10,12 @@ import React, {
 } from 'react';
 import type { Bet, UserStats, LiveEventLog } from '../types/bet';
 import type { OddsFormat } from '../utils/odds';
-import { initialBets, initialStats } from '../data/mockBets';
 import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
 import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
 import { useAuth } from './AuthContext';
-import {
-  canSyncToCloud,
-  fetchRemoteBets,
-  syncBetsToCloud,
-} from '../services/betsRepo';
+import { canSyncToCloud } from '../services/supabase';
+import { fetchRemoteBets, syncBetsToCloud } from '../services/betsRepo';
 import confetti from 'canvas-confetti';
 
 export type { LiveEventLog };
@@ -56,7 +52,6 @@ interface BetContextType {
   addBet: (betData: Omit<Bet, 'id' | 'createdAt'>) => void;
   deleteBet: (id: string) => void;
   clearAllBets: () => void;
-  restoreDemoBets: () => void;
   updateCondition: (
     betId: string,
     conditionId: string,
@@ -73,6 +68,8 @@ const STORAGE_KEY = 'lafija_bets_v1';
 const ODDS_FORMAT_KEY = 'lafija_odds_format_v1';
 const CURRENCY_KEY = 'lafija_currency_v1';
 const INITIAL_BANKROLL_KEY = 'lafija_initial_bankroll_v1';
+/** Bankroll inicial hasta que el usuario configure el suyo. */
+const DEFAULT_INITIAL_BANKROLL = 0;
 
 function readLocalStorage(key: string): string | null {
   try {
@@ -96,10 +93,10 @@ function loadInitialBets(): Bet[] {
     try {
       return JSON.parse(saved) as Bet[];
     } catch {
-      return initialBets;
+      return [];
     }
   }
-  return initialBets;
+  return [];
 }
 
 export const BetProvider: React.FC<{ children: ReactNode }> = ({
@@ -113,7 +110,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       const parsed = parseFloat(saved);
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
-    return initialStats.initialBankroll;
+    return DEFAULT_INITIAL_BANKROLL;
   });
 
   const setInitialBankroll = (amount: number) => {
@@ -281,11 +278,6 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     setLiveLogs([]);
   };
 
-  const restoreDemoBets = () => {
-    setBets(initialBets);
-    setLiveLogs([]);
-  };
-
   const updateCondition = (
     betId: string,
     conditionId: string,
@@ -385,7 +377,6 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         addBet,
         deleteBet,
         clearAllBets,
-        restoreDemoBets,
         updateCondition,
         cashoutBet,
         settleBet,

@@ -34,15 +34,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_USER_KEY = 'lafija_auth_user_v1';
-const LEGACY_AUTH_KEY = 'betpulse_auth_user_v1';
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved =
-      localStorage.getItem(AUTH_USER_KEY) ||
-      localStorage.getItem(LEGACY_AUTH_KEY);
+      localStorage.getItem(AUTH_USER_KEY);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -50,14 +48,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         return null;
       }
     }
-    // Default demo tipster profile
-    return {
-      id: 'usr-demo-1',
-      email: 'tipster@lafija.pro',
-      name: 'Bruno Tipster',
-      avatarUrl: '',
-      isGuest: false,
-    };
+    // Sin sesión guardada: el usuario debe iniciar sesión o entrar como invitado.
+    return null;
   });
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -82,7 +74,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         };
         setUser(profile);
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profile));
-        localStorage.removeItem(LEGACY_AUTH_KEY);
       }
     });
 
@@ -103,12 +94,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         };
         setUser(profile);
         localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profile));
-        localStorage.removeItem(LEGACY_AUTH_KEY);
       } else {
         setUser((prevUser) => {
           if (!prevUser?.isGuest) {
             localStorage.removeItem(AUTH_USER_KEY);
-            localStorage.removeItem(LEGACY_AUTH_KEY);
             return null;
           }
           return prevUser;
@@ -196,7 +185,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     }
     setUser(null);
     localStorage.removeItem(AUTH_USER_KEY);
-    localStorage.removeItem(LEGACY_AUTH_KEY);
   };
 
   const signInAsGuest = () => {
@@ -208,7 +196,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
     };
     setUser(profile);
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(profile));
-    localStorage.removeItem(LEGACY_AUTH_KEY);
     closeAuthModal();
   };
 

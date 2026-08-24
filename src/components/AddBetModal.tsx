@@ -33,28 +33,16 @@ type ConditionField = keyof Pick<
   'market' | 'selection' | 'currentValue' | 'targetValue'
 >;
 
-const DEFAULT_CONDITIONS: Omit<BetCondition, 'id'>[] = [
-  {
-    market: 'Goles Totales',
-    selection: 'Más de 2.5 Goles',
-    targetValue: 2.5,
-    currentValue: 1,
-    progress: 40,
-    unit: 'goles',
-    status: 'IN_PROGRESS',
-    isLock: false,
-  },
-  {
-    market: 'Córners Totales',
-    selection: 'Más de 8.5 Córners',
-    targetValue: 8.5,
-    currentValue: 4,
-    progress: 47,
-    unit: 'córners',
-    status: 'IN_PROGRESS',
-    isLock: false,
-  },
-];
+/** Fila en blanco para empezar a cargar condiciones desde cero. */
+const EMPTY_CONDITION: Omit<BetCondition, 'id'> = {
+  market: '',
+  selection: '',
+  targetValue: 1,
+  currentValue: 0,
+  progress: 0,
+  status: 'PENDING',
+  isLock: false,
+};
 
 interface AddBetModalProps {
   isOpen: boolean;
@@ -73,35 +61,24 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const [homeTeam, setHomeTeam] = useState('');
   const [awayTeam, setAwayTeam] = useState('');
   const [betType, setBetType] = useState<BetType>('bet_builder');
-  const [stake, setStake] = useState('25');
+  const [stake, setStake] = useState('');
   const [inputOddsFormat, setInputOddsFormat] = useState<OddsFormat>(
     globalOddsFormat || 'decimal',
   );
-  const [oddsInput, setOddsInput] = useState('3.50');
-  const [bookmaker, setBookmaker] = useState('Betsson');
+  const [oddsInput, setOddsInput] = useState('');
+  const [bookmaker, setBookmaker] = useState('');
   const [bookmakerRegion, setBookmakerRegion] = useState<'AR' | 'GLOBAL'>('AR');
 
-  // Conditions list
-  const [conditions, setConditions] = useState<Omit<BetCondition, 'id'>[]>(
-    DEFAULT_CONDITIONS,
-  );
+  // Conditions list - arranca con una fila vacía
+  const [conditions, setConditions] = useState<Omit<BetCondition, 'id'>[]>([
+    { ...EMPTY_CONDITION },
+  ]);
 
   // Nota: el form se monta fresco en cada apertura (App renderiza
   // condicionalmente el modal), por lo que no hace falta resetear estado.
 
   const handleAddCondition = () => {
-    setConditions([
-      ...conditions,
-      {
-        market: 'Selección Personalizada',
-        selection: 'Nueva Condición',
-        targetValue: 1,
-        currentValue: 0,
-        progress: 0,
-        status: 'PENDING',
-        isLock: false,
-      },
-    ]);
+    setConditions([...conditions, { ...EMPTY_CONDITION }]);
   };
 
   const handleRemoveCondition = (index: number) => {
@@ -199,8 +176,16 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
 
     const isLive = matchStatus === 'LIVE';
 
-    const mappedConditions: BetCondition[] = conditions.map((c, i) => ({
+    // Descartar filas que el usuario dejó completamente vacías
+    const filledConditions = conditions.filter(
+      (c) => c.selection.trim() !== '' || c.market.trim() !== '',
+    );
+    if (filledConditions.length === 0) return;
+
+    const mappedConditions: BetCondition[] = filledConditions.map((c, i) => ({
       ...c,
+      market: c.market.trim() || 'General',
+      selection: c.selection.trim(),
       id: `cond-${Date.now()}-${i}`,
       status: c.status === 'MET' ? 'MET' : isLive ? 'IN_PROGRESS' : 'PENDING',
     }));
@@ -224,7 +209,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       stake: parsedStake,
       odds: decimalOdds,
       potentialPayout,
-      bookmaker: bookmaker || 'Bet365',
+      bookmaker: bookmaker.trim() || 'Otra',
       status: isLive ? 'LIVE' : 'PENDING',
       cashoutValue: isLive ? parseFloat((parsedStake * 0.9).toFixed(2)) : null,
       conditions: mappedConditions,
@@ -514,6 +499,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               <input
                 id='abm-bookmaker'
                 type='text'
+                required
                 value={bookmaker}
                 onChange={(e) => setBookmaker(e.target.value)}
                 placeholder='ej. Betsson, Stake, 1xBet...'
