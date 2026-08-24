@@ -83,6 +83,8 @@ interface BetContextType {
   settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void;
   /** Anula condiciones por suspensión del partido (regla de cuota 1.0). */
   voidConditions: (betId: string, conditionIds: string[]) => void;
+  /** Carga/corrige la cuota individual de una pata (post-apuesta). */
+  setConditionOdds: (betId: string, conditionId: string, odds?: number) => void;
   /** Super Sub: la línea de la selección hereda al suplente que entró. */
   swapPlayer: (betId: string, conditionId: string, newSelection: string) => void;
   setBetStatus: (betId: string, status: Bet['status']) => void;
@@ -600,6 +602,29 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     });
   };
 
+  /** Carga o corrige la cuota individual de una pata (post-apuesta). */
+  const setConditionOdds = (
+    betId: string,
+    conditionId: string,
+    odds?: number,
+  ) => {
+    sounds.playClickSound();
+    setBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id !== betId) return bet;
+        const valid = typeof odds === 'number' && Number.isFinite(odds) && odds > 0;
+        return {
+          ...bet,
+          conditions: bet.conditions.map((c) =>
+            c.id === conditionId
+              ? { ...c, odds: valid ? odds : undefined }
+              : c,
+          ),
+        };
+      }),
+    );
+  };
+
   const swapPlayer = (
     betId: string,
     conditionId: string,
@@ -691,6 +716,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         cashoutBet,
         settleBet,
         voidConditions,
+        setConditionOdds,
         swapPlayer,
         setBetStatus,
       }}

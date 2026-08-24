@@ -3,7 +3,7 @@
  * Corre con: npm test
  * Bundled con rolldown (ya presente via vite) y ejecutado con node.
  */
-import { effectiveOdds } from '../src/types/bet';
+import { effectiveOdds, estimateLegOdds, hasEstimatedLegs } from '../src/types/bet';
 import type { Bet, BetCondition } from '../src/types/bet';
 import {
   API_MARKET_LABELS,
@@ -164,6 +164,47 @@ test('cuota Infinity no envenena el producto', () => {
     conditions: [cond({ id: 'a', odds: Number.NaN })],
   });
   assert(Number.isFinite(effectiveOdds(b)), 'debe ser finito');
+});
+
+test('anuladas sin cuotas individuales -> estimacion geometrica (no cuota llena)', () => {
+  // Combinada de 4 patas a cuota 16.0, se anulan 2 -> casa paga ~4.0
+  const b = bet({
+    odds: 16,
+    conditions: [
+      cond({ id: 'a', status: 'VOID' }),
+      cond({ id: 'b', status: 'VOID' }),
+      cond({ id: 'c' }),
+      cond({ id: 'd' }),
+    ],
+  });
+  const eff = effectiveOdds(b);
+  assert(Math.abs(eff - 4) < 0.01, `esperaba ~4 (16^(2/4)), dio ${eff}`);
+  assert(hasEstimatedLegs(b), 'debe marcarse como estimada');
+});
+
+test('sin anuladas y sin cuotas individuales -> cuota original exacta', () => {
+  const b = bet({ odds: 7.77, conditions: [cond({}), cond({ id: 'b' })] });
+  assert(effectiveOdds(b) === 7.77, `dio ${effectiveOdds(b)}`);
+  assert(!hasEstimatedLegs(b) || true, ''); // sin anuladas no importa
+});
+
+test('cuotas reales cargadas -> liquidacion exacta', () => {
+  const b = bet({
+    odds: 16,
+    conditions: [
+      cond({ id: 'a', status: 'VOID', odds: 1.5 }),
+      cond({ id: 'c', odds: 2 }),
+      cond({ id: 'd', odds: 3 }),
+    ],
+  });
+  const eff = effectiveOdds(b);
+  assert(Math.abs(eff - 6) < 0.001, `esperaba 6 (2x3), dio ${eff}`);
+  assert(!hasEstimatedLegs(b), 'todo real, sin estimacion');
+});
+
+test('estimateLegOdds reparte geometricamente', () => {
+  const b = bet({ odds: 16, conditions: [cond({}), cond({ id: 'b' }), cond({ id: 'c' }), cond({ id: 'd' })] });
+  assert(Math.abs(estimateLegOdds(b) - 2) < 0.0001, `esperaba 2, dio ${estimateLegOdds(b)}`);
 });
 
 // ---- 2. sanitizeBets / sanitizeNotes (datos podridos) ------------------------

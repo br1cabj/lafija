@@ -120,20 +120,48 @@ export function formatConditionValue(cond: BetCondition): string {
 }
 
 /**
+ * Cuota individual estimada de cada pata: reparto geométrico de la cuota
+ * total. Es la misma aproximación que usan las casas al recalcular un
+ * boleto con anuladas cuando no conocés las cuotas por selección.
+ */
+export function estimateLegOdds(bet: Bet): number {
+  const n = bet.conditions.length;
+  if (n === 0) return Math.max(1, bet.odds);
+  return Math.pow(Math.max(1, bet.odds), 1 / n);
+}
+
+/** Cuota real cargada de una condición; undefined si no hay válida. */
+function legOdds(c: BetCondition): number | undefined {
+  return typeof c.odds === 'number' && c.odds > 0 ? c.odds : undefined;
+}
+
+/** true si alguna pata activa usa cuota estimada en lugar de real. */
+export function hasEstimatedLegs(bet: Bet): boolean {
+  return bet.conditions.some((c) => c.status !== 'VOID' && !legOdds(c));
+}
+
+/**
  * Cuota efectiva de la apuesta tras anulaciones por condición.
- * - Sin cuotas individuales cargadas: la cuota total original.
- * - Con cuotas individuales: producto de las condiciones NO anuladas
- *   (una condición anulada aporta 1.0, regla estándar de las casas).
+ * - Sin anuladas y sin cuotas individuales: la cuota total original.
+ * - Con anuladas: producto de las activas usando su cuota real si fue
+ *   cargada; si no, la estimación geométrica (como recalculan las casas).
  * - Si todas se anulan: 1.0 (reembolso del stake).
  */
 export function effectiveOdds(bet: Bet): number {
-  // Cuotas no positivas (0, NaN cargado como string, etc.) se tratan como ausentes
-  const withOdds = bet.conditions.filter(
-    (c) => typeof c.odds === 'number' && c.odds > 0,
-  );
-  if (withOdds.length === 0) return bet.odds;
+  const total = bet.conditions.length;
+  if (total === 0) return bet.odds;
 
-  const active = withOdds.filter((c) => c.status !== 'VOID');
+  const active = bet.conditions.filter((c) => c.status !== 'VOID');
   if (active.length === 0) return 1;
-  return Number(active.reduce((acc, c) => acc * (c.odds as number), 1).toFixed(3));
+
+  // Sin anuladas y sin cuotas individuales: la original es exacta
+  const anyReal = bet.conditions.some((c) => legOdds(c) !== undefined);
+  if (active.length === total && !anyReal) return bet.odds;
+
+  const fallback = estimateLegOdds(bet);
+  const product = active.reduce(
+    (acc, c) => acc * (legOdds(c) ?? fallback),
+    1,
+  );
+  return Number(product.toFixed(3));
 }

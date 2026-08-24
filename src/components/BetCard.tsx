@@ -1,6 +1,11 @@
-import { useState, useRef, memo } from 'react';
+import { useState, useRef, useMemo, memo } from 'react';
 import type { Bet, BetCondition } from '../types/bet';
-import { effectiveOdds, formatConditionValue } from '../types/bet';
+import {
+  effectiveOdds,
+  estimateLegOdds,
+  formatConditionValue,
+  hasEstimatedLegs,
+} from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
@@ -48,6 +53,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
     setBetStatus,
     deleteBet,
     voidConditions,
+    setConditionOdds,
     swapPlayer,
     oddsFormat,
     currencySymbol,
@@ -366,6 +372,14 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
           </span>
           <span className='text-xs font-bold text-orange-400'>
             {formatOdds(effOdds, oddsFormat)}
+            {hasVoidedConditions && hasEstimatedLegs(bet) && (
+              <span
+                title='Basado en cuotas estimadas: cargá las cuotas reales desde "Anular…" para que coincida con tu casa'
+                className='ml-1 text-[9px] font-normal text-slate-500'
+              >
+                (est.)
+              </span>
+            )}
             {hasVoidedConditions && (
               <span className='ml-1 font-normal text-slate-500 line-through'>
                 {formatOdds(bet.odds, oddsFormat)}
@@ -509,9 +523,14 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
                     </span>
                   )}
                   {isVoid && (
-                    <span className='text-[10px] font-semibold tracking-wide text-slate-500 uppercase'>
+                    <button
+                      type='button'
+                      onClick={() => setShowSuspendDialog(true)}
+                      title='Ajustar cuotas del boleto con los valores reales de tu casa'
+                      className='text-[10px] font-semibold tracking-wide text-slate-500 uppercase underline decoration-dotted underline-offset-2 hover:text-slate-300'
+                    >
                       Cuota 1.0
-                    </span>
+                    </button>
                   )}
 
                   {/* Super Sub: cambiar jugador durante el partido */}
@@ -640,6 +659,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
         onClose={() => setShowSuspendDialog(false)}
         onVoidConditions={(ids) => voidConditions(bet.id, ids)}
         onVoidBet={() => settleBet(bet.id, 'VOID')}
+        setConditionOdds={setConditionOdds}
       />
 
       {/* Diálogo: Super Sub (cambio de jugador) */}
@@ -708,9 +728,31 @@ const SuspendDialog: React.FC<{
   onClose: () => void;
   onVoidConditions: (ids: string[]) => void;
   onVoidBet: () => void;
-}> = ({ isOpen, bet, onClose, onVoidConditions, onVoidBet }) => {
+  setConditionOdds: (betId: string, conditionId: string, odds?: number) => void;
+}> = ({ isOpen, bet, onClose, onVoidConditions, onVoidBet, setConditionOdds }) => {
+  const { oddsFormat, currencySymbol } = useBets();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [oddsDraft, setOddsDraft] = useState<Record<string, number>>({});
   const voidable = bet.conditions.filter((c) => c.status !== 'VOID');
+
+  // Preview de liquidación aplicando los borradores de cuota + anulaciones
+  const preview = useMemo(() => {
+    if (selected.size === 0) return null;
+    const sim: Bet = {
+      ...bet,
+      conditions: bet.conditions.map((c) => {
+        const draft = oddsDraft[c.id];
+        const withDraft = draft ? { ...c, odds: draft } : c;
+        return selected.has(c.id)
+          ? { ...withDraft, status: 'VOID' as const }
+          : withDraft;
+      }),
+    };
+    return {
+      odds: effectiveOdds(sim),
+      estimated: hasEstimatedLegs(sim),
+    };
+  }, [bet, oddsDraft, selected]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -726,6 +768,7 @@ const SuspendDialog: React.FC<{
 
   const close = () => {
     setSelected(new Set());
+    setOddsDraft({});
     onClose();
   };
 
@@ -769,9 +812,96 @@ const SuspendDialog: React.FC<{
               {selected.has(cond.id) && <CheckCircle2 className='h-3 w-3' />}
             </span>
             <span className='truncate'>{cond.selection}</span>
+            {typeof cond.odds === 'number' && cond.odds > 0 && (
+              <span className='ml-auto shrink-0 font-mono-numbers text-[10px] text-slate-500'>
+                @{cond.odds.toFixed(2)}
+              </span>
+            )}
           </button>
         ))}
       </div>
+
+      {/* Cuotas reales por pata: para que la liquidación coincida con la casa */}
+      <details className='mb-3 rounded-md border border-white/10 bg-panel'>
+        <summary className='cursor-pointer px-3 py-2 text-xs font-medium text-slate-400 select-none hover:text-slate-200'>
+          Cargar cuotas reales del ticket{' '}
+          <span className='text-slate-600'>(opcional — mejora el cálculo)</span>
+        </summary>
+        <div className='space-y-1.5 px-3 pb-3 pt-1'>
+          {bet.conditions.map((cond) => {
+            const est = estimateLegOdds(bet).toFixed(2);
+            return (
+              <label
+                key={cond.id}
+                className='flex items-center justify-between gap-2 text-xs'
+              >
+                <span className='truncate text-slate-400'>
+                  {cond.selection}
+                </span>
+                <input
+                  type='number'
+                  step='0.01'
+                  min='1'
+                  inputMode='decimal'
+                  placeholder={est}
+                  defaultValue={
+                    typeof cond.odds === 'number' && cond.odds > 0
+                      ? cond.odds
+                      : ''
+                  }
+                  onChange={(e) =>
+                    setOddsDraft((prev) => {
+                      const next = { ...prev };
+                      const raw = e.target.value.trim();
+                      if (raw === '') delete next[cond.id];
+                      else {
+                        const v = parseFloat(raw.replace(',', '.'));
+                        if (Number.isFinite(v) && v >= 1) next[cond.id] = v;
+                      }
+                      return next;
+                    })
+                  }
+                  aria-label={`Cuota individual de ${cond.selection}`}
+                  className='w-20 shrink-0 rounded border border-white/10 bg-base px-2 py-1 text-right font-mono-numbers text-xs text-white focus:border-brand focus:outline-none'
+                />
+              </label>
+            );
+          })}
+          <p className='pt-1 text-[10px] leading-relaxed text-slate-600'>
+            Vacío = estimación automática ({estimateLegOdds(bet).toFixed(2)} por
+            pata). Con las cuotas reales de tu ticket, la liquidación coincide
+            con tu casa.
+          </p>
+        </div>
+      </details>
+
+      {/* Preview en vivo de la liquidación con la selección actual */}
+      {selected.size > 0 && preview && (
+        <div className='mb-4 flex items-center justify-between gap-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs'>
+          <div>
+            <span className='block text-[10px] tracking-wide text-slate-500 uppercase'>
+              Nueva cuota efectiva
+            </span>
+            <span className='font-mono-numbers font-bold text-orange-400'>
+              {formatOdds(preview.odds, oddsFormat)}
+              {preview.estimated && (
+                <span className='ml-1 text-[9px] font-normal text-slate-500'>
+                  (est.)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className='text-right'>
+            <span className='block text-[10px] tracking-wide text-slate-500 uppercase'>
+              Retorno si ganás
+            </span>
+            <span className='font-mono-numbers font-bold text-emerald-400'>
+              {currencySymbol}
+              {(preview.odds * bet.stake).toFixed(2)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className='flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end'>
         <Button variant='ghost' onClick={close}>
@@ -781,6 +911,10 @@ const SuspendDialog: React.FC<{
           variant='secondary'
           disabled={selected.size === 0}
           onClick={() => {
+            // Guarda las cuotas reales cargadas antes de anular
+            for (const [condId, odds] of Object.entries(oddsDraft)) {
+              setConditionOdds(bet.id, condId, odds);
+            }
             onVoidConditions([...selected]);
             close();
           }}
