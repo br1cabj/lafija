@@ -367,8 +367,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
   // ---- Modo datos reales (polling de partidos en vivo vía /api/sports) ----
 
   const realSyncingRef = useRef(false);
-  // Última vez que se pidieron stats por evento (cadencia STATS_TTL_MS)
-  const statsFetchedAtRef = useRef<Map<number, number>>(new Map());
+  // Última vez que se pidieron stats por fixture (cadencia STATS_TTL_MS)
+  const statsFetchedAtRef = useRef<Map<string, number>>(new Map());
 
   const syncLiveData = useCallback(async () => {
     if (realSyncingRef.current) return;
@@ -395,11 +395,11 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         // Stats solo si hay condiciones que las necesitan (córners, tarjetas,
         // remates, faltas) y como máximo cada 3 min por partido: cambian lento.
         let stats: LiveFixtureStats | null = null;
-        if (fixture.statsId && needsStats(bet)) {
-          const last = statsFetchedAtRef.current.get(fixture.statsId) ?? 0;
+        if (fixture.statsRef && needsStats(bet)) {
+          const last = statsFetchedAtRef.current.get(fixture.statsRef) ?? 0;
           if (Date.now() - last >= STATS_TTL_MS) {
-            stats = await fetchFixtureStats(fixture.statsId);
-            statsFetchedAtRef.current.set(fixture.statsId, Date.now());
+            stats = await fetchFixtureStats(fixture);
+            statsFetchedAtRef.current.set(fixture.statsRef, Date.now());
           }
         }
 

@@ -101,17 +101,19 @@ export function statForCondition(
   const text = normalizeName(`${cond.market} ${cond.selection}`);
 
   // El orden importa: córners/tarjetas antes que goles.
+  // Si la categoría no viene en stats (proveedor sin ese dato), null:
+  // nunca se auto-marca con ceros inventados.
   if (/corner/.test(text)) {
-    return stats ? stats.corners.total : null;
+    return stats?.corners ? stats.corners.total : null;
   }
   if (/tarjeta|card/.test(text)) {
-    return stats ? stats.cards.total : null;
+    return stats?.cards ? stats.cards.total : null;
   }
   if (/tiro|remate|shot/.test(text)) {
-    return stats ? stats.shotsOnTarget.total : null;
+    return stats?.shotsOnTarget ? stats.shotsOnTarget.total : null;
   }
   if (/falta|foul/.test(text)) {
-    return stats ? stats.fouls.total : null;
+    return stats?.fouls ? stats.fouls.total : null;
   }
   if (/gol|goal/.test(text)) {
     // "Más/Menos de X goles" sobre el total del partido

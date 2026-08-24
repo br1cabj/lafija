@@ -1,22 +1,24 @@
 /**
  * Cliente del proxy serverless de datos deportivos.
  * La cuota de API-Football ya NO se consume en el flujo normal: los datos
- * en vivo y las estadísticas salen de /api/results (SofaScore/ESPN gratis,
- * API-Football solo como último recurso de la cascada server-side).
+ * en vivo y las estadísticas salen de /api/results con cascada de fuentes
+ * gratuitas (ESPN -> SportScore -> API-Football solo como último recurso).
  *
  * Endpoints:
- *   GET /api/results?all=1          -> todos los eventos en vivo
- *   GET /api/results?stats=123      -> estadísticas de SofaScore
- *   GET /api/sports?teamsSearch=xxx -> autocomplete de equipos
+ *   GET /api/results?all=1                    -> todos los eventos en vivo
+ *   GET /api/results?stats=<id>&league=<slug> -> estadísticas del partido
+ *   GET /api/sports?teamsSearch=xxx           -> autocomplete de equipos
  */
 
 export interface LiveFixture {
   /** ID numérico del proveedor (para cache interno). */
   fixtureId: number;
-  /** ID de evento en SofaScore; presente solo si el proveedor lo soporta. */
-  statsId?: number;
+  /** ID con prefijo del fixture ("espn-1", "ss-slug", "af-2"): habilita stats. */
+  statsRef?: string;
   provider: string;
   league: string;
+  /** Slug de liga del proveedor (ej. "arg.1" en ESPN), requerido para stats. */
+  leagueSlug?: string;
   minute: string;
   statusShort: string; // LIVE | HT | FT | SCHEDULED | POSTPONED
   homeTeam: string;
@@ -28,14 +30,18 @@ export interface LiveFixture {
   startTime: string;
 }
 
+/**
+ * Estadísticas granulares del partido. Las categorías son opcionales:
+ * ausente = el proveedor no reporta ese dato (NO se asume cero).
+ */
 export interface LiveFixtureStats {
-  fixtureId: number;
+  fixtureId: number | string;
   homeTeam: string;
   awayTeam: string;
-  corners: { home: number; away: number; total: number };
-  shotsOnTarget: { home: number; away: number; total: number };
-  cards: { yellow: number; red: number; total: number };
-  fouls: { total: number };
+  corners?: { home: number; away: number; total: number };
+  shotsOnTarget?: { home: number; away: number; total: number };
+  cards?: { yellow: number; red: number; total: number };
+  fouls?: { total: number };
 }
 
 export interface TeamSuggestion {
@@ -69,6 +75,7 @@ interface ResultsResponse {
   results?: Array<{
     id: string;
     league: string;
+    leagueSlug?: string;
     homeTeam: string;
     awayTeam: string;
     homeScore: number;
@@ -89,9 +96,11 @@ export async function fetchLiveFixtures(): Promise<LiveFixture[]> {
     const source = json.source ?? 'none';
     return (json.results ?? []).map((r) => ({
       fixtureId: numericId(r.id),
-      statsId: source === 'sofascore' ? numericId(r.id) : undefined,
+      // ESPN no publica stats granulares de futbol: solo af- y ss- piden stats
+      statsRef: source === 'espn' ? undefined : r.id,
       provider: source,
       league: r.league,
+      leagueSlug: r.leagueSlug,
       minute: r.minute,
       statusShort: r.status,
       homeTeam: r.homeTeam,
@@ -109,20 +118,28 @@ export async function fetchLiveFixtures(): Promise<LiveFixture[]> {
 }
 
 /**
- * Estadísticas granulares de un partido (SofaScore).
- * `statsId` es el ID de evento de SofaScore del fixture; null si no existe.
+ * Estadísticas granulares de un partido. Usa el id con prefijo del fixture
+ * para elegir la fuente serverless (ESPN/SportScore gratis, API-Football
+ * con cuota vigilada). Devuelve null si no hay datos.
  */
 export async function fetchFixtureStats(
-  statsId: number | undefined,
+  fixture: LiveFixture,
 ): Promise<LiveFixtureStats | null> {
-  if (!statsId) return null;
+  if (!fixture.statsRef) return null;
+  const params = new URLSearchParams({
+    stats: fixture.statsRef,
+    ...(fixture.leagueSlug ? { league: fixture.leagueSlug } : {}),
+  });
   try {
-    const res = await fetch(`/api/results?stats=${statsId}`);
+    const res = await fetch(`/api/results?${params.toString()}`);
     if (!res.ok) return null;
     const json = (await res.json()) as { stats?: LiveFixtureStats | null };
     return json.stats ?? null;
   } catch (err) {
-    console.warn(`Sin estadísticas para el evento ${statsId}:`, err);
+    console.warn(
+      `Sin estadísticas para el evento ${fixture.statsRef}:`,
+      err,
+    );
     return null;
   }
 }
