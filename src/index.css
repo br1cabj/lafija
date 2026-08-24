@@ -1,24 +1,24 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @layer base {
   :root {
-    --bg-main: #0B0C10;
-    --bg-card: #12141C;
-    --bg-card-hover: #181B26;
+    --bg-main: #0b0c10;
+    --bg-card: #12141c;
+    --bg-card-hover: #181b26;
     --bg-panel: #161822;
-    --bg-subtle: #1C202C;
+    --bg-subtle: #1c202c;
     --border-subtle: rgba(255, 255, 255, 0.08);
     --border-active: rgba(255, 85, 0, 0.4);
-    --accent-orange: #FF5500;
-    --accent-orange-hover: #FF661A;
+    --accent-orange: #ff5500;
+    --accent-orange-hover: #ff661a;
     --accent-orange-glow: rgba(255, 85, 0, 0.25);
-    --status-won: #00E676;
-    --status-lost: #FF3344;
-    --status-clutch: #FFB800;
-    --status-live: #00E5FF;
-    --text-primary: #F3F4F6;
-    --text-secondary: #94A3B8;
-    --text-muted: #64748B;
+    --status-won: #00e676;
+    --status-lost: #ff3344;
+    --status-clutch: #ffb800;
+    --status-live: #00e5ff;
+    --text-primary: #f3f4f6;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
   }
 
   * {
@@ -29,7 +29,14 @@
   body {
     background-color: var(--bg-main);
     color: var(--text-primary);
-    font-family: 'Space Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+      'Space Grotesk',
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif;
     overflow-x: hidden;
     margin: 0;
     padding: 0;
@@ -56,29 +63,13 @@
 
 /* Monospace stats typography */
 .font-mono-numbers {
-  font-family: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, monospace;
+  font-family:
+    'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 
-/* Esports HUD Glows & Accents */
-.faceit-glow {
-  box-shadow: 0 0 20px -3px rgba(255, 85, 0, 0.25);
-}
-
-.faceit-glow-green {
-  box-shadow: 0 0 20px -3px rgba(0, 230, 118, 0.25);
-}
-
-.faceit-glow-red {
-  box-shadow: 0 0 20px -3px rgba(255, 51, 68, 0.25);
-}
-
-.faceit-glow-gold {
-  box-shadow: 0 0 20px -3px rgba(255, 184, 0, 0.25);
-}
-
 .faceit-card {
-  background: linear-gradient(180deg, #161822 0%, #11131A 100%);
+  background: linear-gradient(180deg, #161822 0%, #11131a 100%);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
@@ -86,40 +77,9 @@
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-.faceit-card-active {
-  border-left: 3px solid #FF5500;
-}
-
-.faceit-card-won {
-  border-left: 3px solid #00E676;
-}
-
-.faceit-card-lost {
-  border-left: 3px solid #FF3344;
-}
-
-.faceit-card-clutch {
-  border-left: 3px solid #FFB800;
-}
-
-/* Subtle scanline / carbon pattern for header & cards */
-.faceit-pattern {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-
-@keyframes pulse-live {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.92);
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
   }
 }
-
-.animate-pulse-live {
-  animation: pulse-live 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-

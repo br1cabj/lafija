@@ -1,10 +1,10 @@
 export interface BookmakerInfo {
-  id: string
-  name: string
-  shortName: string
-  region: 'AR' | 'GLOBAL' | 'CRYPTO'
-  badgeLabel: string
-  color: string
+  id: string;
+  name: string;
+  shortName: string;
+  region: 'AR' | 'GLOBAL' | 'CRYPTO';
+  badgeLabel: string;
+  color: string;
 }
 
 export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
@@ -15,7 +15,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Betsson',
     region: 'AR',
     badgeLabel: '🇦🇷 Betsson',
-    color: '#FF6B00'
+    color: '#FF6B00',
   },
   {
     id: 'betano',
@@ -23,7 +23,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Betano',
     region: 'AR',
     badgeLabel: '🇦🇷 Betano',
-    color: '#E02020'
+    color: '#E02020',
   },
   {
     id: 'bet365',
@@ -31,7 +31,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Bet365',
     region: 'AR',
     badgeLabel: '🇦🇷 Bet365',
-    color: '#007A3D'
+    color: '#007A3D',
   },
   {
     id: 'codere',
@@ -39,7 +39,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Codere',
     region: 'AR',
     badgeLabel: '🇦🇷 Codere',
-    color: '#68B030'
+    color: '#68B030',
   },
   {
     id: 'bplay',
@@ -47,7 +47,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'bplay',
     region: 'AR',
     badgeLabel: '🇦🇷 bplay',
-    color: '#00E676'
+    color: '#00E676',
   },
   {
     id: 'jugadon',
@@ -55,7 +55,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Jugadon',
     region: 'AR',
     badgeLabel: '🇦🇷 Jugadon',
-    color: '#FFB800'
+    color: '#FFB800',
   },
   {
     id: 'casino_ba',
@@ -63,7 +63,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Casino BA',
     region: 'AR',
     badgeLabel: '🇦🇷 Casino BA',
-    color: '#3B82F6'
+    color: '#3B82F6',
   },
 
   // 🌐 Internacionales / Crypto populares
@@ -73,7 +73,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: '1xBet',
     region: 'GLOBAL',
     badgeLabel: '🌐 1xBet',
-    color: '#1B72BA'
+    color: '#1B72BA',
   },
   {
     id: 'stake',
@@ -81,7 +81,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Stake',
     region: 'CRYPTO',
     badgeLabel: '⚡ Stake',
-    color: '#1475E1'
+    color: '#1475E1',
   },
   {
     id: 'pinnacle',
@@ -89,7 +89,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Pinnacle',
     region: 'GLOBAL',
     badgeLabel: '🎯 Pinnacle',
-    color: '#EE5A24'
+    color: '#EE5A24',
   },
   {
     id: 'betfair',
@@ -97,7 +97,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: 'Betfair',
     region: 'GLOBAL',
     badgeLabel: '🟡 Betfair',
-    color: '#FFB900'
+    color: '#FFB900',
   },
   {
     id: '20bet',
@@ -105,6 +105,6 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     shortName: '20Bet',
     region: 'GLOBAL',
     badgeLabel: '🌐 20Bet',
-    color: '#00B894'
-  }
-]
+    color: '#00B894',
+  },
+];

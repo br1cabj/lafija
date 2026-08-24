@@ -1,11 +1,11 @@
-import type { Bet, UserStats } from '../types/bet'
+import type { Bet, UserStats } from '../types/bet';
 
 export const initialStats: UserStats = {
-  bankroll: 1845.50,
-  initialBankroll: 1200.00,
-  totalStaked: 3420.00,
-  totalWon: 4065.50,
-  netProfit: 645.50,
+  bankroll: 1845.5,
+  initialBankroll: 1200.0,
+  totalStaked: 3420.0,
+  totalWon: 4065.5,
+  netProfit: 645.5,
   roi: 18.87,
   yield: 18.87,
   winRate: 68.4,
@@ -15,7 +15,7 @@ export const initialStats: UserStats = {
   winStreak: 4,
   faceitLevel: 8,
   eloRating: 1840,
-}
+};
 
 export const initialBets: Bet[] = [
   {
@@ -33,17 +33,18 @@ export const initialBets: Bet[] = [
       period: '2H',
       status: 'LIVE',
       startTime: '2026-08-18T21:00:00Z',
-      league: 'UEFA Champions League'
+      league: 'UEFA Champions League',
     },
-    stake: 50.00,
+    stake: 50.0,
     odds: 4.85,
-    potentialPayout: 242.50,
+    potentialPayout: 242.5,
     bookmaker: 'Bet365',
     status: 'LIVE',
-    cashoutValue: 168.00,
+    cashoutValue: 168.0,
     createdAt: '2026-08-18T19:30:00Z',
     tags: ['Champions League', 'BetBuilder', 'HighConfidence'],
-    notes: 'Partido de vuelta semifinales. Madrid atacando por banda izquierda con Vinicius.',
+    notes:
+      'Partido de vuelta semifinales. Madrid atacando por banda izquierda con Vinicius.',
     conditions: [
       {
         id: 'cond-1-1',
@@ -54,7 +55,7 @@ export const initialBets: Bet[] = [
         progress: 100,
         status: 'MET',
         isLock: false,
-        dangerNote: 'Minuto 79: City presionando'
+        dangerNote: 'Minuto 79: City presionando',
       },
       {
         id: 'cond-1-2',
@@ -65,7 +66,7 @@ export const initialBets: Bet[] = [
         progress: 100,
         unit: 'goles',
         status: 'MET',
-        isLock: true // Ya van 3 goles, matemáticamente asegurado
+        isLock: true, // Ya van 3 goles, matemáticamente asegurado
       },
       {
         id: 'cond-1-3',
@@ -76,7 +77,7 @@ export const initialBets: Bet[] = [
         progress: 100,
         unit: 'tiros',
         status: 'MET',
-        isLock: true
+        isLock: true,
       },
       {
         id: 'cond-1-4',
@@ -88,9 +89,9 @@ export const initialBets: Bet[] = [
         unit: 'córners',
         status: 'CLUTCH_DANGER',
         isLock: false,
-        dangerNote: '⚡ CLUTCH: Faltan 2 córners en los últimos 11 min'
-      }
-    ]
+        dangerNote: '⚡ CLUTCH: Faltan 2 córners en los últimos 11 min',
+      },
+    ],
   },
   {
     id: 'bet-002',
@@ -107,14 +108,14 @@ export const initialBets: Bet[] = [
       period: '2H',
       status: 'LIVE',
       startTime: '2026-08-18T20:30:00Z',
-      league: 'Premier League'
+      league: 'Premier League',
     },
-    stake: 35.00,
-    odds: 3.10,
-    potentialPayout: 108.50,
+    stake: 35.0,
+    odds: 3.1,
+    potentialPayout: 108.5,
     bookmaker: '1xBet',
     status: 'LIVE',
-    cashoutValue: 48.20,
+    cashoutValue: 48.2,
     createdAt: '2026-08-18T19:00:00Z',
     tags: ['PremierLeague', 'Derby'],
     conditions: [
@@ -128,7 +129,7 @@ export const initialBets: Bet[] = [
         unit: 'tarjetas',
         status: 'IN_PROGRESS',
         isLock: false,
-        dangerNote: 'Falta 1 tarjeta (partido con mucho roce)'
+        dangerNote: 'Falta 1 tarjeta (partido con mucho roce)',
       },
       {
         id: 'cond-2-2',
@@ -138,9 +139,9 @@ export const initialBets: Bet[] = [
         currentValue: '1-0 (Falta gol de Chelsea)',
         progress: 50,
         status: 'IN_PROGRESS',
-        isLock: false
-      }
-    ]
+        isLock: false,
+      },
+    ],
   },
   {
     id: 'bet-003',
@@ -153,11 +154,11 @@ export const initialBets: Bet[] = [
       awayTeam: 'Dallas Mavericks',
       status: 'SCHEDULED',
       startTime: '2026-08-19T01:30:00Z',
-      league: 'NBA'
+      league: 'NBA',
     },
-    stake: 40.00,
-    odds: 3.60,
-    potentialPayout: 144.00,
+    stake: 40.0,
+    odds: 3.6,
+    potentialPayout: 144.0,
     bookmaker: 'Codere',
     status: 'PENDING',
     createdAt: '2026-08-18T22:00:00Z',
@@ -172,7 +173,7 @@ export const initialBets: Bet[] = [
         progress: 0,
         unit: 'pts',
         status: 'PENDING',
-        isLock: false
+        isLock: false,
       },
       {
         id: 'cond-3-2',
@@ -183,7 +184,7 @@ export const initialBets: Bet[] = [
         progress: 0,
         unit: 'ast',
         status: 'PENDING',
-        isLock: false
+        isLock: false,
       },
       {
         id: 'cond-3-3',
@@ -193,9 +194,9 @@ export const initialBets: Bet[] = [
         currentValue: 'Pre-Match',
         progress: 0,
         status: 'PENDING',
-        isLock: false
-      }
-    ]
+        isLock: false,
+      },
+    ],
   },
   {
     id: 'bet-004',
@@ -210,11 +211,11 @@ export const initialBets: Bet[] = [
       awayScore: 0,
       status: 'FINISHED',
       startTime: '2026-08-17T20:00:00Z',
-      league: 'UEFA Champions League'
+      league: 'UEFA Champions League',
     },
-    stake: 60.00,
-    odds: 2.20,
-    potentialPayout: 132.00,
+    stake: 60.0,
+    odds: 2.2,
+    potentialPayout: 132.0,
     bookmaker: 'Bet365',
     status: 'WON',
     createdAt: '2026-08-17T18:00:00Z',
@@ -228,9 +229,9 @@ export const initialBets: Bet[] = [
         currentValue: '1-0 (Finalizado)',
         progress: 100,
         status: 'MET',
-        isLock: true
-      }
-    ]
+        isLock: true,
+      },
+    ],
   },
   {
     id: 'bet-005',
@@ -245,11 +246,11 @@ export const initialBets: Bet[] = [
       awayScore: 2,
       status: 'FINISHED',
       startTime: '2026-08-16T17:30:00Z',
-      league: 'Bundesliga'
+      league: 'Bundesliga',
     },
-    stake: 25.00,
-    odds: 5.20,
-    potentialPayout: 130.00,
+    stake: 25.0,
+    odds: 5.2,
+    potentialPayout: 130.0,
     bookmaker: 'Stake',
     status: 'LOST',
     createdAt: '2026-08-16T15:00:00Z',
@@ -264,7 +265,7 @@ export const initialBets: Bet[] = [
         progress: 100,
         unit: 'goles',
         status: 'MET',
-        isLock: true
+        isLock: true,
       },
       {
         id: 'cond-5-2',
@@ -274,8 +275,8 @@ export const initialBets: Bet[] = [
         currentValue: 'Empate 2-2',
         progress: 0,
         status: 'BUSTED',
-        isLock: false
-      }
-    ]
-  }
-]
+        isLock: false,
+      },
+    ],
+  },
+];
