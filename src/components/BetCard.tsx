@@ -30,9 +30,11 @@ import {
 interface BetCardProps {
   bet: Bet;
   onShare: (bet: Bet) => void;
+  /** true mientras se genera el PNG para el share nativo (muestra spinner). */
+  isSharing?: boolean;
 }
 
-function BetCardComponent({ bet, onShare }: BetCardProps) {
+function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
   const {
     updateCondition,
     cashoutBet,
@@ -154,10 +156,15 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
         <div className='flex shrink-0 items-center gap-1'>
           <button
             onClick={() => onShare(bet)}
+            disabled={isSharing}
             aria-label='Exportar tarjeta visual para redes'
-            className='rounded-md p-1.5 text-slate-400 transition-colors duration-150 hover:bg-white/5 hover:text-white'
+            className='rounded-md p-1.5 text-slate-400 transition-colors duration-150 hover:bg-white/5 hover:text-white disabled:opacity-50'
           >
-            <Share2 className='h-4 w-4' />
+            {isSharing ? (
+              <span className='block h-4 w-4 animate-spin rounded-full border-2 border-brand border-t-transparent' />
+            ) : (
+              <Share2 className='h-4 w-4' />
+            )}
           </button>
 
           <button
@@ -413,6 +420,14 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                     <Clock className='h-4 w-4 shrink-0 text-slate-500' />
                   )}
                   <div className='min-w-0'>
+                    {cond.market && (
+                      <span
+                        className='block truncate text-[9px] font-semibold tracking-wider text-slate-500 uppercase'
+                        title={cond.market}
+                      >
+                        {cond.market}
+                      </span>
+                    )}
                     <span
                       className={`block truncate font-medium ${
                         isVoid
@@ -423,21 +438,32 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                               ? 'text-red-300 line-through decoration-red-400/50'
                               : isClutch
                                 ? 'text-amber-300'
-                                : 'text-slate-200'
+                                : cond.supersubFrom
+                                  ? 'font-semibold text-cyan-300'
+                                  : 'text-slate-200'
                       }`}
                     >
                       {cond.selection}
                     </span>
                     {cond.supersubFrom && (
-                      <span className='block truncate text-[10px] text-slate-500'>
-                        Super Sub · heredó de {cond.supersubFrom}
+                      <span className='flex items-center gap-1.5 text-[10px]'>
+                        <span className='truncate text-slate-500 line-through decoration-slate-600'>
+                          {cond.supersubFrom}
+                        </span>
+                        <Repeat className='h-2.5 w-2.5 shrink-0 text-cyan-400' />
+                        <span
+                          title={`Super Sub — heredó de: ${cond.supersubFrom}`}
+                          className='shrink-0 rounded-sm border border-cyan-400/40 bg-cyan-400/10 px-1 font-bold tracking-wide text-cyan-300'
+                        >
+                          SUPER SUB
+                        </span>
                       </span>
                     )}
                   </div>
                   {cond.superSub && !isVoid && !cond.supersubFrom && (
                     <span
                       title='Super Sub: la línea hereda al suplente'
-                      className='shrink-0 rounded-sm border border-brand/40 bg-brand/10 px-1 py-0.5 text-[9px] font-bold text-brand'
+                      className='shrink-0 rounded-sm border border-cyan-400/40 bg-cyan-400/10 px-1 py-0.5 text-[9px] font-bold text-cyan-300'
                     >
                       SS
                     </span>
@@ -602,9 +628,12 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
           nombre en la selección.
         </p>
         {swapCondition?.supersubFrom && (
-          <p className='mb-3 rounded-md border border-white/10 bg-panel px-3 py-2 text-xs text-slate-400'>
+          <p className='mb-3 rounded-md border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-xs text-slate-400'>
             Heredó de:{' '}
-            <span className='text-slate-200'>{swapCondition.supersubFrom}</span>
+            <span className='text-slate-500 line-through decoration-slate-600'>
+              {swapCondition.supersubFrom}
+            </span>{' '}
+            <span className='font-semibold text-cyan-300'>➜ suplente</span>
           </p>
         )}
         <label className='mb-1 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>

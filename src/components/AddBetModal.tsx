@@ -7,6 +7,7 @@ import type {
   SportType,
 } from '../types/bet';
 import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
+import { isAutoTrackable } from '../utils/liveSync';
 import { SPORT_OPTIONS } from '../data/sports';
 import {
   parseInputToDecimal,
@@ -574,11 +575,26 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             <button
               type='button'
               onClick={() =>
-                addPreset('Tarjetas Totales', '+3.5 Tarjetas', 3.5, 'tarjetas')
+                addPreset(
+                  'Props de Jugador',
+                  'Jugador 1+ Tiro al arco',
+                  1,
+                  'tiros',
+                )
+              }
+              className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
+              title='Props de jugador: seguimiento manual con los botones + / -'
+            >
+              1+ Tiro a puerta (jugador)
+            </button>
+            <button
+              type='button'
+              onClick={() =>
+                addPreset('Tiros Totales', '+25.5 Tiros totales', 25.5, 'tiros')
               }
               className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
             >
-              +3.5 Tarjetas
+              +25.5 Tiros Totales
             </button>
             <button
               type='button'
@@ -613,7 +629,9 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             </button>
           </div>
 
-          {conditions.map((c, idx) => (
+          {conditions.map((c, idx) => {
+            const auto = isAutoTrackable(c.market, c.selection);
+            return (
             <div
               key={idx}
               className='p-3 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
@@ -629,16 +647,35 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 className='bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white sm:w-1/3 focus:border-brand focus:outline-none'
               />
 
-              <input
-                type='text'
-                aria-label={`Selección condición ${idx + 1}`}
-                placeholder='Selección'
-                value={c.selection}
-                onChange={(e) =>
-                  handleConditionChange(idx, 'selection', e.target.value)
-                }
-                className='bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white sm:w-1/3 focus:border-brand focus:outline-none'
-              />
+              <div className='sm:w-1/3 w-full'>
+                <input
+                  type='text'
+                  aria-label={`Selección condición ${idx + 1}`}
+                  placeholder='Selección'
+                  value={c.selection}
+                  onChange={(e) =>
+                    handleConditionChange(idx, 'selection', e.target.value)
+                  }
+                  className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
+                />
+                {/* Feedback en vivo: el sistema entiende tu condición? */}
+                {(c.market.trim() || c.selection.trim()) && (
+                  <span
+                    title={
+                      auto
+                        ? 'El tracker actualizará esta condición automáticamente con datos reales'
+                        : 'Sin tracking automático: actualizala manualmente con los botones + / -'
+                    }
+                    className={`mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
+                      auto
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-white/5 text-slate-500'
+                    }`}
+                  >
+                    {auto ? '⚡ AUTO' : '✋ MANUAL'}
+                  </span>
+                )}
+              </div>
 
               <div className='flex items-center gap-1.5 sm:w-1/3 justify-end'>
                 <div className='flex items-center gap-1 text-xs font-mono'>
@@ -717,7 +754,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                   }}
                   className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
                     c.superSub
-                      ? 'bg-brand/20 border-brand/50 text-brand'
+                      ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
                       : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
                   }`}
                 >
@@ -736,7 +773,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Submit Buttons */}

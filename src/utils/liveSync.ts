@@ -100,6 +100,9 @@ export function statForCondition(
 
   const text = normalizeName(`${cond.market} ${cond.selection}`);
 
+  // Props de jugador: ninguna fuente gratuita da stats individuales -> manual
+  if (/jugador|player|props/.test(text)) return null;
+
   // El orden importa: córners/tarjetas antes que goles.
   // Si la categoría no viene en stats (proveedor sin ese dato), null:
   // nunca se auto-marca con ceros inventados.
@@ -109,8 +112,11 @@ export function statForCondition(
   if (/tarjeta|card/.test(text)) {
     return stats?.cards ? stats.cards.total : null;
   }
-  if (/tiro|remate|shot/.test(text)) {
+  if (/alarco|apuerta|ontarget|sot|encuadrado/.test(text)) {
     return stats?.shotsOnTarget ? stats.shotsOnTarget.total : null;
+  }
+  if (/tiro|remate|shot|chance/.test(text)) {
+    return stats?.shots ? stats.shots.total : null;
   }
   if (/falta|foul/.test(text)) {
     return stats?.fouls ? stats.fouls.total : null;
@@ -121,6 +127,21 @@ export function statForCondition(
   }
 
   return null;
+}
+
+/**
+ * true si la condición será trackeada automáticamente por el sync.
+ * Misma lógica que statForCondition, expuesta para el feedback
+ * AUTO/MANUAL del formulario (y para tests).
+ */
+export function isAutoTrackable(market: string, selection: string): boolean {
+  const text = normalizeName(`${market} ${selection}`);
+  if (!text) return false;
+  // Props de jugador nunca son automáticas
+  if (/jugador|player|props/.test(text)) return false;
+  return /corner|tarjeta|card|alarco|apuerta|ontarget|sot|encuadrado|tiro|remate|shot|chance|falta|foul|gol|goal/.test(
+    text,
+  );
 }
 
 /** Traduce el status corto de API-Sports al estado interno del match. */

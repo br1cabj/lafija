@@ -8,16 +8,19 @@ import type { Bet, BetCondition } from '../src/types/bet';
 import {
   applyLiveUpdate,
   findFixtureForBet,
+  isAutoTrackable,
   namesMatch,
   needsStats,
   normalizeName,
   statForCondition,
 } from '../src/utils/liveSync';
-import type { LiveFixture } from '../src/services/sportsApi';
+import type { LiveFixture, LiveFixtureStats } from '../src/services/sportsApi';
 import { sanitizeBets, sanitizeNotes } from '../src/utils/sanitize';
 import { computeUserStats } from '../src/utils/stats';
 import { applyConditionDelta, computeCashout } from '../src/utils/simulation';
 import { formatOdds, parseInputToDecimal } from '../src/utils/odds';
+import { ticketCaption, ticketFilename } from '../src/utils/shareTicket';
+import { formatTicketDate } from '../src/utils/slipCanvas';
 
 // ---- Mini framework ---------------------------------------------------------
 
@@ -522,6 +525,108 @@ test('montos absurdos quedan dentro de límites finitos', () => {
   assert(Number.isFinite(b.odds) && b.odds <= 1e6, `odds sin cap: ${b.odds}`);
   assert(Number.isFinite(b.potentialPayout) && b.potentialPayout <= 1e12, 'payout sin cap');
   assert(b.cashoutValue === null, 'cashout negativo -> null');
+});
+
+// ---- 10. share de boletos -----------------------------------------------------
+
+console.log('\n[10] share de boletos');
+
+test('caption existe para todos los estados', () => {
+  for (const status of ['WON', 'LIVE', 'PENDING', 'LOST', 'CASHOUT', 'VOID'] as const) {
+    const c = ticketCaption(bet({ status }));
+    assert(typeof c === 'string' && c.length > 0, `caption vacía para ${status}`);
+  }
+});
+
+test('filename es sanitizado y con tag de estado', () => {
+  const f = ticketFilename(
+    bet({
+      status: 'WON',
+      match: { ...bet({}).match, homeTeam: 'Boca Juniors ⚽', awayTeam: 'River/Plate' },
+    }),
+  );
+  assert(f === 'LaFija-BocaJuniors-vs-RiverPlate-GANADA.png', `dio ${f}`);
+});
+
+test('filename no contiene caracteres ilegales de filesystem', () => {
+  const f = ticketFilename(bet({}));
+  assert(!/[\\/:*?"<>|]/.test(f), `caracteres ilegales en ${f}`);
+});
+
+test('fecha del boleto formatea o devuelve null sin crashear', () => {
+  assert(formatTicketDate('2026-08-24T20:30:00-03:00') !== null, 'fecha válida');
+  assert(formatTicketDate('') === null, 'vacía -> null');
+  assert(formatTicketDate('no-es-fecha') === null, 'basura -> null');
+});
+
+// ---- 11. tiros totales vs al arco + AUTO/MANUAL -------------------------------
+
+console.log('\n[11] parser de tiros y auto-track');
+
+test('tiros totales usan categoria shots, NO shotsOnTarget', () => {
+  const b = bet({
+    conditions: [
+      cond({ id: 'tt', market: 'Tiros Totales', selection: 'Más de 25.5 tiros totales', targetValue: 26, currentValue: 0 }),
+    ],
+  });
+  const stats: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: '', awayTeam: '',
+    shots: { total: 30 },
+    shotsOnTarget: { home: 3, away: 2, total: 5 },
+  };
+  const v = statForCondition(b.conditions[0], fixture(), stats);
+  assert(v === 30, `tiros totales debe dar 30 (shots), dio ${v}`);
+});
+
+test('tiros al arco siguen usando shotsOnTarget', () => {
+  const b = bet({
+    conditions: [
+      cond({ id: 'ar', market: 'Tiros a Puerta', selection: 'Equipo 5+ tiros al arco', targetValue: 6, currentValue: 0 }),
+    ],
+  });
+  const stats: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: '', awayTeam: '',
+    shots: { total: 30 },
+    shotsOnTarget: { home: 3, away: 2, total: 5 },
+  };
+  assert(statForCondition(b.conditions[0], fixture(), stats) === 5, 'al arco = SOT');
+});
+
+test('a puerta / on target / sot -> shotsOnTarget', () => {
+  for (const sel of ['Más de 4 tiros a puerta', 'Over 3 on target', 'SOT 6+']) {
+    const b = bet({
+      conditions: [cond({ id: sel, market: 'M', selection: sel, targetValue: 1, currentValue: 0 })],
+    });
+    const stats: LiveFixtureStats = {
+      fixtureId: 1, homeTeam: '', awayTeam: '',
+      shots: { total: 99 },
+      shotsOnTarget: { home: 1, away: 1, total: 2 },
+    };
+    assert(statForCondition(b.conditions[0], fixture(), stats) === 2, `"${sel}" debe ser SOT`);
+  }
+});
+
+test('shots ausente en stats -> null (sin inventar)', () => {
+  const b = bet({
+    conditions: [
+      cond({ id: 'tt', market: 'Tiros Totales', selection: 'Más de 25.5', targetValue: 26, currentValue: 10 }),
+    ],
+  });
+  const partial: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: '', awayTeam: '',
+    shotsOnTarget: { home: 1, away: 1, total: 2 },
+  };
+  const r = applyLiveUpdate(b, fixture(), partial);
+  assert(r.bet.conditions[0].currentValue === 10, 'congelado sin shots');
+});
+
+test('props de jugador SIEMPRE manuales aunque mencionen métricas', () => {
+  assert(!isAutoTrackable('Props de Jugador', 'Jugador 1+ Tiro al arco'), 'preset jugador');
+  assert(!isAutoTrackable('Jugador', 'Lautaro 2+ goles'), 'jugador con gol');
+  assert(isAutoTrackable('Córners Totales', '+8.5 Córners'), 'córners equipo');
+  assert(isAutoTrackable('Tiros Totales', '+25.5 Tiros totales'), 'tiros equipo');
+  assert(isAutoTrackable('Goles', 'Más de 2.5'), 'goles');
+  assert(!isAutoTrackable('', ''), 'vacío');
 });
 
 // ---- Resumo -----------------------------------------------------------------

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import type { Bet } from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { generateSlipBlob } from '../utils/slipCanvas';
+import { ticketFilename } from '../utils/shareTicket';
 import { Modal } from './ui/Modal';
 import {
   X,
@@ -41,15 +42,20 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
   const [ticketState, setTicketState] = useState<{
     key: string;
     blob: Blob | null;
-    dataUrl: string | null;
+    url: string | null;
     error: string | null;
   }>({
     key: '',
     blob: null,
-    dataUrl: null,
+    url: null,
     error: null,
   });
   const [copiedImage, setCopiedImage] = useState(false);
+
+  // El aviso de long-press solo aplica a dispositivos táctiles
+  const isTouch =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(pointer: coarse)').matches;
 
   const currentKey = useMemo(
     () => (bet ? makeTicketKey(bet, oddsFormat, currencySymbol) : ''),
@@ -62,26 +68,27 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
     ticketState.key !== currentKey &&
     !ticketState.error;
   const imageBlob = ticketState.key === currentKey ? ticketState.blob : null;
-  const imageUrl = ticketState.key === currentKey ? ticketState.dataUrl : null;
+  const imageUrl = ticketState.key === currentKey ? ticketState.url : null;
   const errorMessage =
     ticketState.key === currentKey ? ticketState.error : null;
 
-  // Generate instantaneously via pure 2D Canvas
   useEffect(() => {
     if (!isOpen || !bet) return;
 
     let isMounted = true;
+    let objectUrl: string | null = null;
 
     generateSlipBlob(bet, oddsFormat, currencySymbol)
-      .then(({ blob, dataUrl }) => {
-        if (isMounted) {
-          setTicketState({
-            key: makeTicketKey(bet, oddsFormat, currencySymbol),
-            blob,
-            dataUrl,
-            error: null,
-          });
-        }
+      .then(({ blob }) => {
+        if (!isMounted) return;
+        // ObjectURL en vez de base64: la mitad de memoria y render directo
+        objectUrl = URL.createObjectURL(blob);
+        setTicketState({
+          key: makeTicketKey(bet, oddsFormat, currencySymbol),
+          blob,
+          url: objectUrl,
+          error: null,
+        });
       })
       .catch((err) => {
         console.error('Error generando boleto:', err);
@@ -89,7 +96,7 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
           setTicketState({
             key: makeTicketKey(bet, oddsFormat, currencySymbol),
             blob: null,
-            dataUrl: null,
+            url: null,
             error: 'No se pudo generar la imagen.',
           });
         }
@@ -97,6 +104,7 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
 
     return () => {
       isMounted = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [isOpen, bet, oddsFormat, currencySymbol]);
 
@@ -105,7 +113,7 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
   // Direct File Download (uses the already-generated Blob, not the base64)
   const handleDownload = () => {
     if (!imageBlob) return;
-    const fileName = `LaFija-${bet.match.homeTeam.replace(/\s+/g, '')}-vs-${bet.match.awayTeam.replace(/\s+/g, '')}.png`;
+    const fileName = ticketFilename(bet);
     const url = URL.createObjectURL(imageBlob);
     const link = document.createElement('a');
     link.download = fileName;
@@ -159,13 +167,15 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
         </button>
       </div>
 
-      {/* Safari / Mobile Long-Press Callout */}
-      <div className='mb-2.5 p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-center gap-2 text-[11px] text-orange-300 font-medium'>
-        <Smartphone className='w-4 h-4 text-brand shrink-0' />
-        <span>
-          iPhone: mantén presionada la tarjeta para guardarla o compartirla.
-        </span>
-      </div>
+      {/* Safari / Mobile Long-Press Callout (solo dispositivos táctiles) */}
+      {isTouch && (
+        <div className='mb-2.5 p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-center gap-2 text-[11px] text-orange-300 font-medium'>
+          <Smartphone className='w-4 h-4 text-brand shrink-0' />
+          <span>
+            iPhone: mantén presionada la tarjeta para guardarla o compartirla.
+          </span>
+        </div>
+      )}
 
       {/* Error Alert */}
       {errorMessage && (

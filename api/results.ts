@@ -370,6 +370,7 @@ interface PartialStats {
   homeTeam: string;
   awayTeam: string;
   corners?: { home: number; away: number; total: number };
+  shots?: { total: number };
   shotsOnTarget?: { home: number; away: number; total: number };
   cards?: { yellow: number; red: number; total: number };
   fouls?: { total: number };
@@ -419,10 +420,14 @@ async function handleSportScoreStats(
 
   // Córners/tiros/faltas: del array stats si viene poblado
   const rows = Array.isArray(match.stats) ? match.stats : [];
-  const pick = (rx: RegExp): { home: number; away: number } | null => {
+  const pick = (
+    rx: RegExp,
+    excludeRx?: RegExp,
+  ): { home: number; away: number } | null => {
     for (const s of rows) {
       const name = String(s.name ?? '');
       if (!rx.test(name)) continue;
+      if (excludeRx && excludeRx.test(name)) continue;
       const h = parseInt(String(s.home ?? ''), 10);
       const a = parseInt(String(s.away ?? ''), 10);
       if (!isNaN(h) && !isNaN(a)) return { home: h, away: a };
@@ -431,11 +436,19 @@ async function handleSportScoreStats(
   };
 
   const corners = pick(/corner/i);
-  const sot = pick(/on target|sot/i);
+  const sot = pick(/on target|sot|on goal/i);
+  // Tiros totales: cualquier fila de shots que NO sea de arco
+  const shotsTotal = pick(/shot|remate/i, /on target|sot|on goal/i);
   const fouls = pick(/foul/i);
 
   const cardsTotal = yellowH + yellowA + redH + redA;
-  if (corners === null && sot === null && fouls === null && cardsTotal === 0) {
+  if (
+    corners === null &&
+    sot === null &&
+    shotsTotal === null &&
+    fouls === null &&
+    cardsTotal === 0
+  ) {
     sendJson(res, 200, { stats: null });
     return;
   }
@@ -446,6 +459,7 @@ async function handleSportScoreStats(
     awayTeam: match.away_team ?? '',
   };
   if (corners !== null) stats.corners = pair(corners.home, corners.away);
+  if (shotsTotal !== null) stats.shots = { total: shotsTotal.home + shotsTotal.away };
   if (sot !== null) stats.shotsOnTarget = pair(sot.home, sot.away);
   if (cardsTotal > 0) {
     stats.cards = { yellow: yellowH + yellowA, red: redH + redA, total: cardsTotal };
@@ -509,6 +523,10 @@ async function handleApiFootballStats(
   const cornersAway = afStatValue(away, /corner/i);
   const sotHome = afStatValue(home, /shots?\s*on\s*goal|on\s*target/i);
   const sotAway = afStatValue(away, /shots?\s*on\s*goal|on\s*target/i);
+  // Tiros TOTALES: "Shots Total"/"Total Shots" (excluye los de arco)
+  const shotsTotal =
+    afStatValue(home, /shots?\s*total|total\s*shots/i) +
+    afStatValue(away, /shots?\s*total|total\s*shots/i);
   const yellowHome = afStatValue(home, /yellow/i);
   const yellowAway = afStatValue(away, /yellow/i);
   const redHome = afStatValue(home, /red/i);
@@ -526,6 +544,7 @@ async function handleApiFootballStats(
         away: cornersAway,
         total: cornersHome + cornersAway,
       },
+      ...(shotsTotal > 0 ? { shots: { total: shotsTotal } } : {}),
       shotsOnTarget: {
         home: sotHome,
         away: sotAway,

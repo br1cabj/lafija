@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useState } from 'react';
 import { BetProvider, useBets } from './context/BetContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotesProvider } from './context/NotesContext';
@@ -16,6 +16,7 @@ import { Button } from './components/ui/Button';
 import { ADS_ENABLED } from './config/ads';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { PWAUpdateToast } from './components/PWAUpdateToast';
+import { tryNativeShare } from './utils/shareTicket';
 
 /* Modales y vistas secundarias: se descargan solo cuando se usan. */
 const AddBetModal = lazy(() =>
@@ -53,6 +54,8 @@ const DashboardContent: React.FC = () => {
     cloudSyncStatus,
     lastCloudSyncAt,
     retryCloudSync,
+    oddsFormat,
+    currencySymbol,
   } = useBets();
   const { user } = useAuth();
   const { isAuthModalOpen } = useAuth();
@@ -61,6 +64,21 @@ const DashboardContent: React.FC = () => {
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [selectedBetForShare, setSelectedBetForShare] = useState<Bet | null>(
     null,
+  );
+  const [sharingBetId, setSharingBetId] = useState<string | null>(null);
+
+  /** Móvil: sheet nativo del SO directo. Desktop/sin soporte: modal con preview. */
+  const handleShare = useCallback(
+    async (targetBet: Bet) => {
+      setSharingBetId(targetBet.id);
+      const result = await tryNativeShare(
+        targetBet,
+        oddsFormat,
+        currencySymbol,
+      ).finally(() => setSharingBetId(null));
+      if (result !== 'shared') setSelectedBetForShare(targetBet);
+    },
+    [oddsFormat, currencySymbol],
   );
 
   // Filtering logic
@@ -178,7 +196,8 @@ const DashboardContent: React.FC = () => {
                     <BetCard
                       key={bet.id}
                       bet={bet}
-                      onShare={(targetBet) => setSelectedBetForShare(targetBet)}
+                      isSharing={sharingBetId === bet.id}
+                      onShare={(targetBet) => void handleShare(targetBet)}
                     />
                   ))
                 )}
