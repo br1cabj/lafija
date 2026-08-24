@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import { useState, useRef, memo } from 'react';
 import type { Bet, BetCondition } from '../types/bet';
+import { formatConditionValue } from '../types/bet';
 import { useBets } from '../context/BetContext';
-import { formatOdds } from '../utils/odds';
+import { useClickOutside } from '../hooks/useClickOutside';
+import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
 import {
   CheckCircle2,
   XCircle,
@@ -24,7 +26,7 @@ interface BetCardProps {
   onShare: (bet: Bet) => void;
 }
 
-export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
+function BetCardComponent({ bet, onShare }: BetCardProps) {
   const {
     updateCondition,
     cashoutBet,
@@ -36,6 +38,9 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
   } = useBets();
   const [showMenu, setShowMenu] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(menuRef, () => setShowMenu(false), showMenu);
 
   const totalConditions = bet.conditions.length;
   const metConditions = bet.conditions.filter((c) => c.status === 'MET').length;
@@ -49,9 +54,11 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
   const isMatchPoint =
     bet.status === 'LIVE' && totalConditions >= 2 && pendingConditions === 1;
 
+  const toggleCollapse = () => setIsCollapsed(!isCollapsed);
+
   return (
     <div
-      className={`bg-[#12141C] rounded-lg p-3.5 sm:p-4 mb-3 transition-all relative ${
+      className={`bg-surface rounded-lg p-3.5 sm:p-4 mb-3 transition-all relative ${
         isMatchPoint
           ? 'border-2 border-orange-500 shadow-lg shadow-orange-950/60 ring-1 ring-orange-500/40'
           : 'border border-white/10 hover:border-white/20'
@@ -116,17 +123,20 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
         <div className='flex items-center gap-1 shrink-0'>
           <button
             onClick={() => onShare(bet)}
-            className='p-1.5 text-slate-300 hover:text-orange-400 rounded bg-white/5 hover:bg-white/10 transition-colors'
-            title='Exportar tarjeta visual para redes'
+            aria-label='Exportar tarjeta visual para redes'
+            className='p-1.5 text-slate-300 hover:text-brand rounded bg-white/5 hover:bg-white/10 transition-colors'
           >
             <Share2 className='w-3.5 h-3.5' />
           </button>
 
           {/* Collapse/Expand Toggle */}
           <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={toggleCollapse}
+            aria-expanded={!isCollapsed}
+            aria-label={
+              isCollapsed ? 'Expandir condiciones' : 'Plegar condiciones'
+            }
             className='p-1.5 text-slate-300 hover:text-white rounded bg-white/5 hover:bg-white/10 transition-colors'
-            title={isCollapsed ? 'Expandir condiciones' : 'Plegar tarjeta'}
           >
             {isCollapsed ? (
               <ChevronDown className='w-3.5 h-3.5' />
@@ -136,99 +146,97 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
           </button>
 
           {/* More Menu Dropdown */}
-          <div className='relative'>
+          <div className='relative' ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
+              aria-label='Más acciones'
+              aria-expanded={showMenu}
               className='p-1.5 text-slate-400 hover:text-white rounded bg-white/5 hover:bg-white/10'
             >
               <MoreVertical className='w-3.5 h-3.5' />
             </button>
 
             {showMenu && (
-              <>
-                <div
-                  className='fixed inset-0 z-10'
-                  onClick={() => setShowMenu(false)}
-                />
-                <div className='absolute right-0 top-7 z-20 bg-[#1A1D28] border border-white/15 rounded-md shadow-2xl py-1 w-44 text-xs text-slate-200'>
-                  {bet.status === 'PENDING' && (
-                    <button
-                      onClick={() => {
-                        setBetStatus(bet.id, 'LIVE');
-                        setShowMenu(false);
-                      }}
-                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-orange-400 flex items-center gap-1.5 font-semibold'
-                    >
-                      <Play className='w-3.5 h-3.5' /> Iniciar En Vivo
-                    </button>
-                  )}
-
-                  {bet.status === 'LIVE' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          settleBet(bet.id, 'WON');
-                          setShowMenu(false);
-                        }}
-                        className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-emerald-400 flex items-center gap-1.5 font-semibold'
-                      >
-                        <Trophy className='w-3.5 h-3.5' /> Ganada
-                      </button>
-                      <button
-                        onClick={() => {
-                          settleBet(bet.id, 'LOST');
-                          setShowMenu(false);
-                        }}
-                        className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-red-400 flex items-center gap-1.5 font-semibold'
-                      >
-                        <XCircle className='w-3.5 h-3.5' /> Perdida
-                      </button>
-                      <button
-                        onClick={() => {
-                          setBetStatus(bet.id, 'PENDING');
-                          setShowMenu(false);
-                        }}
-                        className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-slate-300 flex items-center gap-1.5'
-                      >
-                        <Clock className='w-3.5 h-3.5' /> Pausar (Pre-Match)
-                      </button>
-                    </>
-                  )}
-
-                  {(bet.status === 'WON' ||
-                    bet.status === 'LOST' ||
-                    bet.status === 'CASHOUT') && (
-                    <button
-                      onClick={() => {
-                        setBetStatus(bet.id, 'LIVE');
-                        setShowMenu(false);
-                      }}
-                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 font-semibold'
-                    >
-                      <RotateCcw className='w-3.5 h-3.5' /> Reactivar a En Vivo
-                    </button>
-                  )}
-
+              <div className='absolute right-0 top-7 z-20 bg-elevated border border-white/15 rounded-md shadow-2xl py-1 w-44 text-xs text-slate-200'>
+                {bet.status === 'PENDING' && (
                   <button
                     onClick={() => {
-                      deleteBet(bet.id);
+                      setBetStatus(bet.id, 'LIVE');
                       setShowMenu(false);
                     }}
-                    className='w-full text-left px-3 py-1.5 hover:bg-red-950/50 text-red-400 flex items-center gap-1.5 border-t border-white/10 font-semibold'
+                    className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-brand flex items-center gap-1.5 font-semibold'
                   >
-                    <Trash2 className='w-3.5 h-3.5' /> Eliminar
+                    <Play className='w-3.5 h-3.5' /> Iniciar En Vivo
                   </button>
-                </div>
-              </>
+                )}
+
+                {bet.status === 'LIVE' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        settleBet(bet.id, 'WON');
+                        setShowMenu(false);
+                      }}
+                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-emerald-400 flex items-center gap-1.5 font-semibold'
+                    >
+                      <Trophy className='w-3.5 h-3.5' /> Ganada
+                    </button>
+                    <button
+                      onClick={() => {
+                        settleBet(bet.id, 'LOST');
+                        setShowMenu(false);
+                      }}
+                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-red-400 flex items-center gap-1.5 font-semibold'
+                    >
+                      <XCircle className='w-3.5 h-3.5' /> Perdida
+                    </button>
+                    <button
+                      onClick={() => {
+                        setBetStatus(bet.id, 'PENDING');
+                        setShowMenu(false);
+                      }}
+                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-slate-300 flex items-center gap-1.5'
+                    >
+                      <Clock className='w-3.5 h-3.5' /> Pausar (Pre-Match)
+                    </button>
+                  </>
+                )}
+
+                {(bet.status === 'WON' ||
+                  bet.status === 'LOST' ||
+                  bet.status === 'CASHOUT') && (
+                  <button
+                    onClick={() => {
+                      setBetStatus(bet.id, 'LIVE');
+                      setShowMenu(false);
+                    }}
+                    className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 font-semibold'
+                  >
+                    <RotateCcw className='w-3.5 h-3.5' /> Reactivar a En Vivo
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    deleteBet(bet.id);
+                    setShowMenu(false);
+                  }}
+                  className='w-full text-left px-3 py-1.5 hover:bg-red-950/50 text-red-400 flex items-center gap-1.5 border-t border-white/10 font-semibold'
+                >
+                  <Trash2 className='w-3.5 h-3.5' /> Eliminar
+                </button>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Match Title & Score */}
-      <div
-        onClick={() => setIsCollapsed(!isCollapsed)}
-        className='flex items-baseline justify-between mb-2.5 cursor-pointer select-none'
+      {/* Match Title & Score - clickable collapse toggle */}
+      <button
+        type='button'
+        onClick={toggleCollapse}
+        aria-expanded={!isCollapsed}
+        className='w-full flex items-baseline justify-between mb-2.5 cursor-pointer select-none text-left'
       >
         <h3 className='text-base font-bold text-white tracking-tight flex items-center gap-2'>
           <span>{bet.match.homeTeam}</span>
@@ -240,7 +248,7 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
           <span className='text-slate-400 font-normal text-xs'>vs</span>
           <span>{bet.match.awayTeam}</span>
         </h3>
-      </div>
+      </button>
 
       {/* Clean Financial Strip */}
       <div className='bg-[#08090D] px-3 py-2 rounded-lg border border-white/5 flex items-center justify-between text-xs font-mono mb-2.5'>
@@ -255,15 +263,7 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
         </div>
         <div className='text-center'>
           <span className='text-slate-400 text-[10px] uppercase font-bold block'>
-            Cuota (
-            {oddsFormat === 'decimal'
-              ? 'DEC'
-              : oddsFormat === 'american'
-                ? 'AME'
-                : oddsFormat === 'fractional'
-                  ? 'FRA'
-                  : 'IMP'}
-            )
+            Cuota ({ODDS_FORMAT_SHORT[oddsFormat]})
           </span>
           <span className='font-black text-orange-400 text-xs'>
             {formatOdds(bet.odds, oddsFormat)}
@@ -282,27 +282,46 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
 
       {/* Conditions Checklist (Collapsed vs Full View) */}
       {!isCollapsed ? (
-        <div className='space-y-2 mb-3'>
+        <ul className='space-y-2 mb-3'>
           {bet.conditions.map((cond: BetCondition) => {
             const isMet = cond.status === 'MET';
+            const isBusted = cond.status === 'BUSTED';
+            const isClutch = cond.status === 'CLUTCH_DANGER';
 
             return (
-              <div
+              <li
                 key={cond.id}
+                title={cond.dangerNote}
                 className={`p-2.5 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 border ${
                   isMet
                     ? 'bg-emerald-950/30 border-emerald-500/30'
-                    : 'bg-[#161822] border-white/10'
+                    : isBusted
+                      ? 'bg-red-950/30 border-red-500/30'
+                      : isClutch
+                        ? 'bg-amber-950/30 border-amber-500/40'
+                        : 'bg-panel border-white/10'
                 }`}
               >
                 <div className='flex items-center gap-2 min-w-0'>
                   {isMet ? (
                     <CheckCircle2 className='w-4 h-4 text-emerald-400 shrink-0' />
+                  ) : isBusted ? (
+                    <XCircle className='w-4 h-4 text-red-400 shrink-0' />
+                  ) : isClutch ? (
+                    <Flame className='w-4 h-4 text-amber-400 fill-amber-400 shrink-0 animate-pulse' />
                   ) : (
                     <div className='w-4 h-4 rounded-full border-2 border-slate-500 shrink-0' />
                   )}
                   <span
-                    className={`truncate font-semibold ${isMet ? 'text-emerald-200' : 'text-slate-100'}`}
+                    className={`truncate font-semibold ${
+                      isMet
+                        ? 'text-emerald-200'
+                        : isBusted
+                          ? 'text-red-200 line-through'
+                          : isClutch
+                            ? 'text-amber-200'
+                            : 'text-slate-100'
+                    }`}
                   >
                     {cond.selection}
                   </span>
@@ -311,51 +330,57 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
                 {/* Progress Count & Fat-Finger Friendly Touch Controls */}
                 <div className='flex items-center gap-2 shrink-0 font-mono'>
                   <span
-                    className={`text-xs font-black ${isMet ? 'text-emerald-400' : 'text-orange-400'}`}
+                    className={`text-xs font-black ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
                   >
-                    {typeof cond.currentValue === 'number' &&
-                    typeof cond.targetValue === 'number'
-                      ? `${cond.currentValue}/${cond.targetValue}`
-                      : cond.currentValue}
+                    {formatConditionValue(cond)}
                   </span>
 
                   {/* Big Touch Targets for Mobile + / - */}
                   {typeof cond.currentValue === 'number' &&
                     bet.status === 'LIVE' &&
-                    !isMet && (
+                    !isMet &&
+                    !isBusted && (
                       <div className='flex items-center gap-1 bg-black/60 p-1 rounded-lg border border-white/10'>
                         <button
                           onClick={() => updateCondition(bet.id, cond.id, -1)}
+                          aria-label={`Restar 1 a ${cond.selection}`}
                           className='w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-[0.85] text-slate-200 rounded-md transition-transform'
-                          title='Restar 1'
                         >
                           <Minus className='w-3.5 h-3.5' />
                         </button>
                         <button
                           onClick={() => updateCondition(bet.id, cond.id, 1)}
-                          className='w-7 h-7 flex items-center justify-center bg-[#FF5500] hover:bg-[#FF661A] active:scale-[0.85] text-white rounded-md font-bold shadow-md transition-transform'
-                          title='Sumar 1'
+                          aria-label={`Sumar 1 a ${cond.selection}`}
+                          className='w-7 h-7 flex items-center justify-center bg-brand hover:bg-brand-hover active:scale-[0.85] text-white rounded-md font-bold shadow-md transition-transform'
                         >
                           <Plus className='w-3.5 h-3.5' />
                         </button>
                       </div>
                     )}
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       ) : (
         /* Slim Collapsed Summary */
         <div className='mb-2 px-2 py-1.5 bg-white/5 rounded text-[11px] font-mono text-slate-300 flex items-center justify-between'>
           <span className='truncate'>
             {bet.conditions
-              .map(
-                (c) => (c.status === 'MET' ? '✅' : '⏳') + ' ' + c.selection,
+              .map((c) =>
+                c.status === 'MET'
+                  ? '✅'
+                  : c.status === 'BUSTED'
+                    ? '❌'
+                    : c.status === 'CLUTCH_DANGER'
+                      ? '🔥'
+                      : '⏳',
               )
-              .join(' • ')}
+              .join(' ')}{' '}
+            {' • '}
+            {bet.conditions.map((c) => c.selection).join(' • ')}
           </span>
-          <span className='text-orange-400 font-bold ml-2 shrink-0'>
+          <span className='text-brand font-bold ml-2 shrink-0'>
             {metConditions}/{totalConditions}
           </span>
         </div>
@@ -366,6 +391,11 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
         <div className='flex items-center gap-2 flex-1'>
           <div className='w-24 bg-[#08090D] h-2 rounded-full overflow-hidden border border-white/5'>
             <div
+              role='progressbar'
+              aria-valuenow={globalProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label='Progreso de condiciones'
               className={`h-full rounded-full transition-all duration-300 ${
                 isMatchPoint
                   ? 'bg-gradient-to-r from-orange-500 to-amber-400'
@@ -383,7 +413,7 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
         {bet.status === 'LIVE' && bet.cashoutValue && (
           <button
             onClick={() => cashoutBet(bet.id)}
-            className='bg-[#FF5500] hover:bg-[#FF661A] text-white font-mono font-black text-xs px-3.5 py-1.5 rounded-lg shadow-md shadow-orange-950/60 active:scale-95 transition-all'
+            className='bg-brand hover:bg-brand-hover text-white font-mono font-black text-xs px-3.5 py-1.5 rounded-lg shadow-md shadow-orange-950/60 active:scale-95 transition-all'
           >
             Cashout {currencySymbol}
             {bet.cashoutValue.toFixed(2)}
@@ -392,4 +422,6 @@ export const BetCard: React.FC<BetCardProps> = ({ bet, onShare }) => {
       </div>
     </div>
   );
-};
+}
+
+export const BetCard = memo(BetCardComponent);

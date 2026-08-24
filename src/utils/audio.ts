@@ -1,15 +1,41 @@
 // Web Audio API Synthesizer & Mobile Haptics Engine (No external sound files required)
 
+const MUTED_KEY = 'lafija_sound_muted';
+
+function readMutedPreference(): boolean {
+  try {
+    return localStorage.getItem(MUTED_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeMutedPreference(muted: boolean): void {
+  try {
+    localStorage.setItem(MUTED_KEY, String(muted));
+  } catch {
+    // Storage bloqueado (p.ej. Safari privado): se ignora.
+  }
+}
+
+interface ToneOptions {
+  type: OscillatorType;
+  /** Frecuencia inicial en Hz */
+  freq: number;
+  /** Frecuencia final opcional para rampa exponencial */
+  freqEnd?: number;
+  /** Duración de la rampa de frecuencia (default: duración completa) */
+  freqRampTime?: number;
+  duration: number;
+  peakGain: number;
+  startDelay?: number;
+}
+
 class SoundEngine {
   private ctx: AudioContext | null = null;
-  public isMuted: boolean = false;
+  public isMuted: boolean = readMutedPreference();
 
   constructor() {
-    const saved =
-      localStorage.getItem('lafija_sound_muted') ||
-      localStorage.getItem('betpulse_sound_muted');
-    this.isMuted = saved === 'true';
-
     if (typeof window !== 'undefined') {
       const unlock = () => {
         this.getContext();
@@ -25,9 +51,15 @@ class SoundEngine {
     if (typeof window === 'undefined') return null;
     if (!this.ctx) {
       const AudioCtx =
-        window.AudioContext || (window as any).webkitAudioContext;
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
       if (AudioCtx) {
-        this.ctx = new AudioCtx();
+        try {
+          this.ctx = new AudioCtx();
+        } catch {
+          return null;
+        }
       }
     }
     if (this.ctx && this.ctx.state === 'suspended') {
@@ -38,8 +70,33 @@ class SoundEngine {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
-    localStorage.setItem('lafija_sound_muted', String(this.isMuted));
+    writeMutedPreference(this.isMuted);
     return this.isMuted;
+  }
+
+  /** Reproduce una nota con envolvente de ganancia exponencial. */
+  private playTone(ctx: AudioContext, opts: ToneOptions): void {
+    const now = ctx.currentTime + (opts.startDelay ?? 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = opts.type;
+    osc.frequency.setValueAtTime(opts.freq, now);
+    if (opts.freqEnd !== undefined) {
+      osc.frequency.exponentialRampToValueAtTime(
+        opts.freqEnd,
+        now + (opts.freqRampTime ?? opts.duration),
+      );
+    }
+
+    gain.gain.setValueAtTime(opts.peakGain, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + opts.duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + opts.duration);
   }
 
   // Cyber Chime when a condition is met (HIT!)
@@ -48,23 +105,14 @@ class SoundEngine {
     const ctx = this.getContext();
     if (!ctx) return;
 
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, now); // A5
-    osc.frequency.exponentialRampToValueAtTime(1318.5, now + 0.15); // E6
-
-    gain.gain.setValueAtTime(0.18, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.35);
-
+    this.playTone(ctx, {
+      type: 'sine',
+      freq: 880, // A5
+      freqEnd: 1318.5, // E6
+      freqRampTime: 0.15,
+      duration: 0.35,
+      peakGain: 0.18,
+    });
     this.vibrate([40, 30, 60]);
   }
 
@@ -74,25 +122,15 @@ class SoundEngine {
     const ctx = this.getContext();
     if (!ctx) return;
 
-    const now = ctx.currentTime;
     const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
-
     notes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const startTime = now + index * 0.08;
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, startTime);
-
-      gain.gain.setValueAtTime(0.2, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(startTime);
-      osc.stop(startTime + 0.6);
+      this.playTone(ctx, {
+        type: 'triangle',
+        freq,
+        duration: 0.6,
+        peakGain: 0.2,
+        startDelay: index * 0.08,
+      });
     });
 
     this.vibrate([100, 50, 100, 50, 200]);
@@ -130,21 +168,12 @@ class SoundEngine {
     const ctx = this.getContext();
     if (!ctx) return;
 
-    const now = ctx.currentTime;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(1200, now);
-
-    gain.gain.setValueAtTime(0.05, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.04);
+    this.playTone(ctx, {
+      type: 'sine',
+      freq: 1200,
+      duration: 0.04,
+      peakGain: 0.05,
+    });
   }
 
   // Mobile Native Haptics

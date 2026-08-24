@@ -4,27 +4,39 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useRef,
   useCallback,
   type ReactNode,
 } from 'react';
-import type { Bet, UserStats } from '../types/bet';
+import type { Bet, UserStats, LiveEventLog } from '../types/bet';
 import type { OddsFormat } from '../utils/odds';
 import { initialBets, initialStats } from '../data/mockBets';
 import { sounds } from '../utils/audio';
+import { computeUserStats } from '../utils/stats';
+import { tickLiveBets, applyConditionDelta } from '../utils/simulation';
+import { useAuth } from './AuthContext';
+import {
+  canSyncToCloud,
+  fetchRemoteBets,
+  syncBetsToCloud,
+} from '../services/betsRepo';
 import confetti from 'canvas-confetti';
 
-export interface LiveEventLog {
-  id: string;
-  time: string;
-  betId: string;
-  matchTitle: string;
-  text: string;
-  type: 'GOAL' | 'CORNER' | 'CARD' | 'SHOT' | 'CUMPLIDO' | 'CLUTCH' | 'INFO';
+export type { LiveEventLog };
+
+export interface BetCounts {
+  all: number;
+  live: number;
+  pending: number;
+  won: number;
+  lost: number;
+  cashout: number;
 }
 
 interface BetContextType {
   bets: Bet[];
   stats: UserStats;
+  counts: BetCounts;
   initialBankroll: number;
   setInitialBankroll: (amount: number) => void;
   filter: string;
@@ -53,7 +65,6 @@ interface BetContextType {
   cashoutBet: (betId: string) => void;
   settleBet: (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => void;
   setBetStatus: (betId: string, status: Bet['status']) => void;
-  recalcStats: () => void;
 }
 
 const BetContext = createContext<BetContextType | undefined>(undefined);
@@ -63,11 +74,41 @@ const ODDS_FORMAT_KEY = 'lafija_odds_format_v1';
 const CURRENCY_KEY = 'lafija_currency_v1';
 const INITIAL_BANKROLL_KEY = 'lafija_initial_bankroll_v1';
 
+function readLocalStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage bloqueado (p.ej. Safari privado): se ignora silenciosamente.
+  }
+}
+
+function loadInitialBets(): Bet[] {
+  const saved = readLocalStorage(STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved) as Bet[];
+    } catch {
+      return initialBets;
+    }
+  }
+  return initialBets;
+}
+
 export const BetProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
+  const { user } = useAuth();
+
   const [initialBankroll, setInitialBankrollState] = useState<number>(() => {
-    const saved = localStorage.getItem(INITIAL_BANKROLL_KEY);
+    const saved = readLocalStorage(INITIAL_BANKROLL_KEY);
     if (saved) {
       const parsed = parseFloat(saved);
       if (!isNaN(parsed) && parsed >= 0) return parsed;
@@ -77,23 +118,23 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
 
   const setInitialBankroll = (amount: number) => {
     setInitialBankrollState(amount);
-    localStorage.setItem(INITIAL_BANKROLL_KEY, String(amount));
+    writeLocalStorage(INITIAL_BANKROLL_KEY, String(amount));
   };
 
   const [currency, setCurrencyState] = useState<'ARS' | 'USD'>(() => {
-    const saved = localStorage.getItem(CURRENCY_KEY);
+    const saved = readLocalStorage(CURRENCY_KEY);
     return saved === 'USD' ? 'USD' : 'ARS';
   });
 
   const setCurrency = (c: 'ARS' | 'USD') => {
     setCurrencyState(c);
-    localStorage.setItem(CURRENCY_KEY, c);
+    writeLocalStorage(CURRENCY_KEY, c);
   };
 
   const currencySymbol = currency === 'ARS' ? '$' : 'US$';
 
   const [oddsFormat, setOddsFormatState] = useState<OddsFormat>(() => {
-    const saved = localStorage.getItem(ODDS_FORMAT_KEY) as OddsFormat;
+    const saved = readLocalStorage(ODDS_FORMAT_KEY) as OddsFormat;
     return saved === 'american' || saved === 'fractional' || saved === 'implied'
       ? saved
       : 'decimal';
@@ -101,260 +142,119 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
 
   const setOddsFormat = (format: OddsFormat) => {
     setOddsFormatState(format);
-    localStorage.setItem(ODDS_FORMAT_KEY, format);
+    writeLocalStorage(ODDS_FORMAT_KEY, format);
   };
 
-  const [bets, setBets] = useState<Bet[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return initialBets;
-      }
-    }
-    return initialBets;
-  });
+  const [bets, setBets] = useState<Bet[]>(loadInitialBets);
 
   const [filter, setFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedSport, setSelectedSport] = useState<string>('ALL');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [liveLogs, setLiveLogs] = useState<LiveEventLog[]>([
-    {
-      id: 'log-1',
-      time: '79:12',
-      betId: 'bet-001',
-      matchTitle: 'Real Madrid vs Man City',
-      text: 'Vinicius Jr remató al arco (2do remate) -> ¡Condición Cumplida!',
-      type: 'CUMPLIDO',
-    },
-    {
-      id: 'log-2',
-      time: '75:40',
-      betId: 'bet-001',
-      matchTitle: 'Real Madrid vs Man City',
-      text: 'Córner #7 para Real Madrid. Faltan 2 para cumplir condición.',
-      type: 'CORNER',
-    },
-  ]);
+  const [liveLogs, setLiveLogs] = useState<LiveEventLog[]>([]);
 
-  // Save to localStorage
+  // Mirror ref so the simulation interval always reads fresh bets without
+  // stale closures or side effects inside state updaters.
+  const betsRef = useRef(bets);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bets));
+    betsRef.current = bets;
   }, [bets]);
 
-  // Derive stats reactively with useMemo (no cascading effect renders)
-  const stats = useMemo<UserStats>(() => {
-    const totalStaked = bets.reduce((acc, b) => acc + b.stake, 0);
-    const wonBets = bets.filter((b) => b.status === 'WON');
-    const lostBets = bets.filter((b) => b.status === 'LOST');
-    const cashoutBets = bets.filter((b) => b.status === 'CASHOUT');
-    const voidBets = bets.filter((b) => b.status === 'VOID');
-    const liveBets = bets.filter((b) => b.status === 'LIVE');
+  // Persist to localStorage
+  useEffect(() => {
+    writeLocalStorage(STORAGE_KEY, JSON.stringify(bets));
+  }, [bets]);
 
-    const totalWon =
-      wonBets.reduce((acc, b) => acc + b.potentialPayout, 0) +
-      cashoutBets.reduce((acc, b) => acc + (b.cashoutValue || 0), 0) +
-      voidBets.reduce((acc, b) => acc + b.stake, 0);
+  // ---- Supabase cloud sync ----
+  const cloudUserId =
+    user && !user.isGuest && canSyncToCloud() ? user.id : null;
 
-    const settledCount = wonBets.length + lostBets.length + cashoutBets.length;
-    const winRate =
-      settledCount > 0 ? (wonBets.length / settledCount) * 100 : 0;
-
-    const settledStaked =
-      wonBets.reduce((a, b) => a + b.stake, 0) +
-      lostBets.reduce((a, b) => a + b.stake, 0) +
-      cashoutBets.reduce((a, b) => a + b.stake, 0);
-    const netProfit =
-      totalWon - (settledStaked + voidBets.reduce((a, b) => a + b.stake, 0));
-    const roi = settledStaked > 0 ? (netProfit / settledStaked) * 100 : 0;
-
-    // Clutch bets are live bets with at least one condition in danger or past minute 75
-    const clutchBets = liveBets.filter((b) =>
-      b.conditions.some((c) => c.status === 'CLUTCH_DANGER'),
-    ).length;
-
-    // Faceit rating based on win rate & profit
-    const elo = Math.round(1500 + winRate * 5 + netProfit * 0.4);
-    const level = Math.min(10, Math.max(1, Math.floor(elo / 200)));
-
-    return {
-      bankroll: Number((initialBankroll + netProfit).toFixed(2)),
-      initialBankroll,
-      totalStaked: Number(totalStaked.toFixed(2)),
-      totalWon: Number(totalWon.toFixed(2)),
-      netProfit: Number(netProfit.toFixed(2)),
-      roi: Number(roi.toFixed(2)),
-      yield: Number(roi.toFixed(2)),
-      winRate: Number(winRate.toFixed(1)),
-      activeBets: bets.filter(
-        (b) => b.status === 'LIVE' || b.status === 'PENDING',
-      ).length,
-      liveBets: liveBets.length,
-      clutchBets,
-      winStreak: wonBets.length > 0 ? Math.min(wonBets.length, 5) : 0,
-      faceitLevel: level,
-      eloRating: elo,
+  // Pull remote bets once per logged-in user; remote wins over local draft.
+  const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
+  const syncReady = Boolean(cloudUserId) && syncedUserId === cloudUserId;
+  useEffect(() => {
+    if (!cloudUserId) return;
+    let cancelled = false;
+    fetchRemoteBets(cloudUserId).then((remoteBets) => {
+      if (cancelled) return;
+      if (remoteBets.length > 0) {
+        setBets(remoteBets);
+      } else {
+        // First login: seed the cloud account with local data.
+        syncBetsToCloud(cloudUserId, betsRef.current).catch(() => {});
+      }
+      setSyncedUserId(cloudUserId);
+    });
+    return () => {
+      cancelled = true;
     };
-  }, [bets, initialBankroll]);
+  }, [cloudUserId]);
 
-  const recalcStats = useCallback(() => {
-    // Kept for backward compatibility
-  }, []);
+  // Debounced push of every local change while signed in.
+  useEffect(() => {
+    if (!cloudUserId || !syncReady) return;
+    const timer = setTimeout(() => {
+      syncBetsToCloud(cloudUserId, bets).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [bets, cloudUserId, syncReady]);
 
-  // Simulation loop for live game dynamics (corners, goals, minute tick)
+  // Derived stats & counts (single source of truth)
+  const stats = useMemo(
+    () => computeUserStats(bets, initialBankroll),
+    [bets, initialBankroll],
+  );
+
+  const counts = useMemo<BetCounts>(
+    () => ({
+      all: bets.length,
+      live: bets.filter((b) => b.status === 'LIVE').length,
+      pending: bets.filter((b) => b.status === 'PENDING').length,
+      won: bets.filter((b) => b.status === 'WON').length,
+      lost: bets.filter((b) => b.status === 'LOST').length,
+      cashout: bets.filter((b) => b.status === 'CASHOUT').length,
+    }),
+    [bets],
+  );
+
+  // Simulation loop - pure tick + side effects outside the updater
   useEffect(() => {
     if (!isSimulating) return;
 
     const interval = setInterval(() => {
-      let soundToPlay: 'hit' | 'danger' | 'win' | null = null;
-      const newLogs: LiveEventLog[] = [];
-      let triggerConfetti = false;
+      const result = tickLiveBets(betsRef.current);
 
-      setBets((prevBets) => {
-        return prevBets.map((bet) => {
-          if (bet.status !== 'LIVE') return bet;
-
-          // Safe minute increment
-          const currentMin =
-            parseInt(bet.match.minute?.replace(/[^0-9]/g, '') || '50', 10) ||
-            50;
-          const newMin = currentMin < 90 ? currentMin + 1 : 90;
-
-          // Update conditions randomly
-          const updatedConditions = bet.conditions.map((cond) => {
-            if (cond.isLock || cond.status === 'MET') return cond;
-
-            // If it's a numeric condition like corners/shots/cards
-            if (
-              typeof cond.targetValue === 'number' &&
-              typeof cond.currentValue === 'number'
-            ) {
-              const shouldIncrement = Math.random() > 0.6;
-              if (shouldIncrement) {
-                const nextVal = cond.currentValue + 1;
-                const nextProgress = Math.min(
-                  100,
-                  Math.round((nextVal / cond.targetValue) * 100),
-                );
-                const isNowMet = nextVal >= cond.targetValue;
-
-                if (isNowMet) {
-                  if (soundToPlay !== 'win') soundToPlay = 'hit';
-                  newLogs.push({
-                    id: `log-${Date.now()}-${Math.random()}`,
-                    time: `${newMin}'`,
-                    betId: bet.id,
-                    matchTitle: `${bet.match.homeTeam} vs ${bet.match.awayTeam}`,
-                    text: `🎯 ¡HIT! ${cond.selection} alcanzado (${nextVal}/${cond.targetValue})`,
-                    type: 'CUMPLIDO',
-                  });
-                } else {
-                  newLogs.push({
-                    id: `log-${Date.now()}-${Math.random()}`,
-                    time: `${newMin}'`,
-                    betId: bet.id,
-                    matchTitle: `${bet.match.homeTeam} vs ${bet.match.awayTeam}`,
-                    text: `⚡ Progreso en ${cond.market}: ${nextVal}/${cond.targetValue} ${cond.unit || ''}`,
-                    type: 'CORNER',
-                  });
-                }
-
-                return {
-                  ...cond,
-                  currentValue: nextVal,
-                  progress: nextProgress,
-                  status: isNowMet
-                    ? ('MET' as const)
-                    : newMin > 80
-                      ? ('CLUTCH_DANGER' as const)
-                      : ('IN_PROGRESS' as const),
-                  isLock: isNowMet,
-                };
-              }
-            }
-
-            // If time is late, flag clutch danger
-            if (newMin >= 80 && cond.status === 'IN_PROGRESS') {
-              if (!soundToPlay) soundToPlay = 'danger';
-              return {
-                ...cond,
-                status: 'CLUTCH_DANGER' as const,
-                dangerNote: `⚠️ TIEMPO CRÍTICO: ${newMin}' - Faltan condiciones`,
-              };
-            }
-
-            return cond;
-          });
-
-          // Check if all conditions are met
-          const allMet =
-            updatedConditions.length > 0 &&
-            updatedConditions.every((c) => c.status === 'MET');
-          if (allMet && bet.status === 'LIVE') {
-            soundToPlay = 'win';
-            triggerConfetti = true;
-            return {
-              ...bet,
-              match: { ...bet.match, minute: `${newMin}'` },
-              conditions: updatedConditions,
-              status: 'WON',
-            };
-          }
-
-          // Dynamic cashout value variation (safe from 0 conditions)
-          const metCount = updatedConditions.filter(
-            (c) => c.status === 'MET',
-          ).length;
-          const ratio =
-            updatedConditions.length > 0
-              ? metCount / updatedConditions.length
-              : 0;
-          const dynamicCashout =
-            Math.round(bet.stake * (1 + ratio * (bet.odds - 1) * 0.85) * 100) /
-            100;
-
-          return {
-            ...bet,
-            match: {
-              ...bet.match,
-              minute: `${newMin}'`,
-            },
-            cashoutValue: dynamicCashout,
-            conditions: updatedConditions,
-          };
-        });
-      });
-
-      // Trigger side-effects outside of state updater
-      if (soundToPlay === 'win') {
-        sounds.playWinSound();
-      } else if (soundToPlay === 'hit') {
-        sounds.playHitSound();
-      } else if (soundToPlay === 'danger') {
-        sounds.playDangerSound();
+      if (result.logs.length > 0) {
+        setLiveLogs((logs) => [...result.logs, ...logs].slice(0, 20));
       }
 
-      if (triggerConfetti) {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
+      if (result.sound === 'win') sounds.playWinSound();
+      else if (result.sound === 'hit') sounds.playHitSound();
+      else if (result.sound === 'danger') sounds.playDangerSound();
+
+      if (result.confetti) {
+        confetti({ particleCount: 80, spread: 70, origin: { y: 0.6 } });
       }
 
-      if (newLogs.length > 0) {
-        setLiveLogs((logs) => [...newLogs, ...logs].slice(0, 20));
+      if (
+        result.sound !== null ||
+        result.confetti ||
+        result.logs.length > 0 ||
+        result.bets !== betsRef.current
+      ) {
+        betsRef.current = result.bets;
+        setBets(result.bets);
       }
     }, 4000);
 
     return () => clearInterval(interval);
   }, [isSimulating]);
 
-  const toggleSimulation = () => {
-    setIsSimulating((prev) => !prev);
-  };
+  const toggleSimulation = () => setIsSimulating((prev) => !prev);
+
+  const pushLog = useCallback((log: LiveEventLog) => {
+    setLiveLogs((logs) => [log, ...logs].slice(0, 20));
+  }, []);
 
   const addBet = (betData: Omit<Bet, 'id' | 'createdAt'>) => {
     const newBet: Bet = {
@@ -364,22 +264,17 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     };
     setBets((prev) => [newBet, ...prev]);
 
-    setLiveLogs((logs) => [
-      {
-        id: `log-${Date.now()}`,
-        time: 'AHORA',
-        betId: newBet.id,
-        matchTitle: `${newBet.match.homeTeam} vs ${newBet.match.awayTeam}`,
-        text: `Registrada nueva apuesta: Cuota ${newBet.odds.toFixed(2)} [Stake $${newBet.stake}]`,
-        type: 'INFO',
-      },
-      ...logs.slice(0, 19),
-    ]);
+    pushLog({
+      id: `log-${Date.now()}`,
+      time: 'AHORA',
+      betId: newBet.id,
+      matchTitle: `${newBet.match.homeTeam} vs ${newBet.match.awayTeam}`,
+      text: `Registrada nueva apuesta: Cuota ${newBet.odds.toFixed(2)} [Stake ${currencySymbol}${newBet.stake}]`,
+      type: 'INFO',
+    });
   };
 
-  const deleteBet = (id: string) => {
-    setBets((prev) => prev.filter((b) => b.id !== id));
-  };
+  const deleteBet = (id: string) => setBets((prev) => prev.filter((b) => b.id !== id));
 
   const clearAllBets = () => {
     setBets([]);
@@ -388,24 +283,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
 
   const restoreDemoBets = () => {
     setBets(initialBets);
-    setLiveLogs([
-      {
-        id: `log-${Date.now()}-1`,
-        time: '79:12',
-        betId: 'bet-001',
-        matchTitle: 'Real Madrid vs Man City',
-        text: 'Vinicius Jr remató al arco (2do remate) -> ¡Condición Cumplida!',
-        type: 'CUMPLIDO',
-      },
-      {
-        id: `log-${Date.now()}-2`,
-        time: '75:40',
-        betId: 'bet-001',
-        matchTitle: 'Real Madrid vs Man City',
-        text: 'Córner #7 para Real Madrid. Faltan 2 para cumplir condición.',
-        type: 'CORNER',
-      },
-    ]);
+    setLiveLogs([]);
   };
 
   const updateCondition = (
@@ -413,121 +291,49 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     conditionId: string,
     deltaValue: number,
   ) => {
-    setBets((prev) =>
-      prev.map((bet) => {
-        if (bet.id !== betId) return bet;
+    const target = betsRef.current.find((b) => b.id === betId);
+    if (!target) return;
 
-        const newConditions = bet.conditions.map((cond) => {
-          if (cond.id !== conditionId) return cond;
-          if (
-            typeof cond.currentValue === 'number' &&
-            typeof cond.targetValue === 'number'
-          ) {
-            const updatedVal = Math.max(0, cond.currentValue + deltaValue);
-            const isMet = updatedVal >= cond.targetValue;
-            const progress = Math.min(
-              100,
-              Math.round((updatedVal / cond.targetValue) * 100),
-            );
+    const next = applyConditionDelta(target, conditionId, deltaValue);
+    setBets((prev) => prev.map((b) => (b.id === betId ? next : b)));
 
-            return {
-              ...cond,
-              currentValue: updatedVal,
-              progress,
-              status: isMet ? ('MET' as const) : ('IN_PROGRESS' as const),
-              isLock: isMet,
-            };
-          }
-          return cond;
-        });
-
-        const allMet =
-          newConditions.length > 0 &&
-          newConditions.every((c) => c.status === 'MET');
-        if (allMet) {
-          sounds.playWinSound();
-          confetti({
-            particleCount: 100,
-            spread: 80,
-            origin: { y: 0.6 },
-          });
-        } else if (deltaValue > 0) {
-          sounds.playHitSound();
-        }
-
-        // Recalculate dynamic cashout
-        const metCount = newConditions.filter((c) => c.status === 'MET').length;
-        const ratio =
-          newConditions.length > 0 ? metCount / newConditions.length : 0;
-        const dynamicCashout =
-          Math.round(bet.stake * (1 + ratio * (bet.odds - 1) * 0.85) * 100) /
-          100;
-
-        let nextStatus = bet.status;
-        if (allMet) {
-          nextStatus = 'WON';
-        } else if (bet.status === 'WON' && !allMet) {
-          nextStatus = 'LIVE';
-        }
-
-        return {
-          ...bet,
-          status: nextStatus,
-          cashoutValue: dynamicCashout,
-          conditions: newConditions,
-        };
-      }),
-    );
+    // Side effects outside the updater (StrictMode-safe)
+    if (next.status === 'WON') {
+      sounds.playWinSound();
+      confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
+    } else if (deltaValue > 0) {
+      sounds.playHitSound();
+    }
   };
 
   const cashoutBet = (betId: string) => {
     sounds.playClickSound();
     setBets((prev) =>
-      prev.map((bet) => {
-        if (bet.id === betId) {
-          return {
-            ...bet,
-            status: 'CASHOUT',
-          };
-        }
-        return bet;
-      }),
+      prev.map((bet) =>
+        bet.id === betId ? { ...bet, status: 'CASHOUT' as const } : bet,
+      ),
     );
-
-    setLiveLogs((logs) => [
-      {
-        id: `log-${Date.now()}`,
-        time: 'CASHOUT',
-        betId,
-        matchTitle: 'Cashout Ejecutado',
-        text: `Apuesta cerrada exitosamente asegurando ganancia`,
-        type: 'INFO',
-      },
-      ...logs.slice(0, 19),
-    ]);
+    pushLog({
+      id: `log-${Date.now()}`,
+      time: 'CASHOUT',
+      betId,
+      matchTitle: 'Cashout Ejecutado',
+      text: 'Apuesta cerrada exitosamente asegurando ganancia',
+      type: 'INFO',
+    });
   };
 
   const settleBet = (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => {
+    if (outcome === 'WON') {
+      sounds.playWinSound();
+      confetti({ particleCount: 100, spread: 90, origin: { y: 0.5 } });
+    } else {
+      sounds.playClickSound();
+    }
     setBets((prev) =>
-      prev.map((bet) => {
-        if (bet.id === betId) {
-          if (outcome === 'WON') {
-            sounds.playWinSound();
-            confetti({
-              particleCount: 100,
-              spread: 90,
-              origin: { y: 0.5 },
-            });
-          } else {
-            sounds.playClickSound();
-          }
-          return {
-            ...bet,
-            status: outcome,
-          };
-        }
-        return bet;
-      }),
+      prev.map((bet) =>
+        bet.id === betId ? { ...bet, status: outcome } : bet,
+      ),
     );
   };
 
@@ -535,23 +341,21 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     sounds.playClickSound();
     setBets((prev) =>
       prev.map((bet) => {
-        if (bet.id === betId) {
-          const isLive = status === 'LIVE';
-          return {
-            ...bet,
-            status,
-            match: {
-              ...bet.match,
-              status: isLive
-                ? 'LIVE'
-                : status === 'PENDING'
-                  ? 'SCHEDULED'
-                  : 'FINISHED',
-              minute: isLive ? bet.match.minute || "01'" : bet.match.minute,
-            },
-          };
-        }
-        return bet;
+        if (bet.id !== betId) return bet;
+        const isLive = status === 'LIVE';
+        return {
+          ...bet,
+          status,
+          match: {
+            ...bet.match,
+            status: isLive
+              ? 'LIVE'
+              : status === 'PENDING'
+                ? 'SCHEDULED'
+                : 'FINISHED',
+            minute: isLive ? bet.match.minute || "01'" : bet.match.minute,
+          },
+        };
       }),
     );
   };
@@ -561,6 +365,7 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       value={{
         bets,
         stats,
+        counts,
         initialBankroll,
         setInitialBankroll,
         filter,
@@ -585,7 +390,6 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         cashoutBet,
         settleBet,
         setBetStatus,
-        recalcStats,
       }}
     >
       {children}

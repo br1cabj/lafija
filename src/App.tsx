@@ -23,19 +23,6 @@ const DashboardContent: React.FC = () => {
     null,
   );
 
-  // Global Escape key listener for open modals
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsAddModalOpen(false);
-        setIsAnalyticsModalOpen(false);
-        setSelectedBetForShare(null);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Filtering logic
   const filteredBets = bets.filter((bet) => {
     // Status filter
@@ -76,7 +63,7 @@ const DashboardContent: React.FC = () => {
   });
 
   return (
-    <div className='min-h-screen bg-[#0B0C10] text-[#F3F4F6] pb-24 md:pb-12'>
+    <div className='min-h-screen bg-base text-[#F3F4F6] pb-24 md:pb-12'>
       {/* PWA Mobile Install Prompt */}
       <PWAInstallBanner />
 
@@ -105,7 +92,7 @@ const DashboardContent: React.FC = () => {
 
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className='text-xs font-mono font-bold text-[#FF5500] hover:text-orange-400 flex items-center gap-1'
+                className='text-xs font-mono font-bold text-brand hover:text-orange-400 flex items-center gap-1'
               >
                 <Plus className='w-3.5 h-3.5' />
                 <span>Nueva Apuesta</span>
@@ -113,7 +100,7 @@ const DashboardContent: React.FC = () => {
             </div>
 
             {filteredBets.length === 0 ? (
-              <div className='bg-[#12141C] border border-dashed border-white/10 rounded-lg p-8 text-center'>
+              <div className='bg-surface border border-dashed border-white/10 rounded-lg p-8 text-center'>
                 <div className='w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5'>
                   <Zap className='w-5 h-5' />
                 </div>
@@ -125,7 +112,7 @@ const DashboardContent: React.FC = () => {
                 </p>
                 <button
                   onClick={() => setIsAddModalOpen(true)}
-                  className='px-3.5 py-1.5 bg-[#FF5500] hover:bg-[#FF661A] text-white text-xs font-bold uppercase rounded shadow'
+                  className='px-3.5 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase rounded shadow'
                 >
                   + Crear Apuesta
                 </button>
@@ -148,11 +135,10 @@ const DashboardContent: React.FC = () => {
         </div>
       </main>
 
-      {/* Modals */}
-      <AddBetModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
+      {/* Modals - AddBetModal se monta fresco en cada apertura */}
+      {isAddModalOpen && (
+        <AddBetModal isOpen onClose={() => setIsAddModalOpen(false)} />
+      )}
 
       <AnalyticsModal
         isOpen={isAnalyticsModalOpen}

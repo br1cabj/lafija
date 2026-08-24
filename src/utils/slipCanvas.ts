@@ -1,4 +1,5 @@
 import type { Bet } from '../types/bet';
+import { formatConditionValue } from '../types/bet';
 import { formatOdds, type OddsFormat } from './odds';
 
 /**
@@ -158,12 +159,7 @@ export async function generateSlipBlob(
     ctx.textAlign = 'right';
     ctx.fillStyle = isMet ? '#10B981' : '#FF9900';
     ctx.font = 'bold 13px monospace';
-    const valText =
-      typeof cond.currentValue === 'number' &&
-      typeof cond.targetValue === 'number'
-        ? `${cond.currentValue}/${cond.targetValue}`
-        : String(cond.currentValue ?? '');
-    ctx.fillText(valText, width - 48, rowY + 23);
+    ctx.fillText(formatConditionValue(cond), width - 48, rowY + 23);
   });
 
   // 5. Big Financials Banner (Cuota, Stake, Retorno)

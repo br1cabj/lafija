@@ -1,5 +1,13 @@
 export type OddsFormat = 'decimal' | 'american' | 'fractional' | 'implied';
 
+/** Abreviaturas de formato reutilizadas en Header, BetCard, etc. */
+export const ODDS_FORMAT_SHORT: Record<OddsFormat, string> = {
+  decimal: 'DEC',
+  american: 'AME',
+  fractional: 'FRA',
+  implied: 'IMP',
+};
+
 // Greatest Common Divisor helper for fractional odds
 function gcd(a: number, b: number): number {
   return b < 0.00001 ? a : gcd(b, Math.floor(a % b));
@@ -100,25 +108,33 @@ export function formatOdds(
   }
 }
 
-export function parseInputToDecimal(input: string, format: OddsFormat): number {
-  if (!input || input.trim() === '') return 1.0;
+/**
+ * Parsea el input del usuario a cuota decimal.
+ * Devuelve `null` si la entrada es inválida para que la UI pueda avisar
+ * en lugar de convertir silenciosamente a 1.00.
+ */
+export function parseInputToDecimal(
+  input: string,
+  format: OddsFormat,
+): number | null {
+  if (!input || input.trim() === '') return null;
 
   const cleaned = input.trim();
 
   if (format === 'decimal') {
     const val = parseFloat(cleaned.replace(',', '.'));
-    return isNaN(val) || val < 1 ? 1.0 : val;
+    return isNaN(val) || val < 1 ? null : val;
   }
 
   if (format === 'american') {
     const num = parseInt(cleaned.replace('+', ''), 10);
-    if (isNaN(num)) return 1.0;
+    if (isNaN(num)) return null;
     if (num > 0) {
       return parseFloat((num / 100 + 1).toFixed(3));
     } else if (num < 0) {
       return parseFloat((100 / Math.abs(num) + 1).toFixed(3));
     }
-    return 1.0;
+    return null;
   }
 
   if (format === 'fractional') {
@@ -129,9 +145,10 @@ export function parseInputToDecimal(input: string, format: OddsFormat): number {
       if (!isNaN(num) && !isNaN(den) && den !== 0) {
         return parseFloat((num / den + 1).toFixed(3));
       }
+      return null;
     }
     const val = parseFloat(cleaned);
-    return isNaN(val) ? 1.0 : val;
+    return isNaN(val) ? null : val;
   }
 
   if (format === 'implied') {
@@ -139,10 +156,10 @@ export function parseInputToDecimal(input: string, format: OddsFormat): number {
     if (!isNaN(cleanProb) && cleanProb > 0 && cleanProb <= 100) {
       return parseFloat((100 / cleanProb).toFixed(3));
     }
-    return 1.0;
+    return null;
   }
 
-  return 1.0;
+  return null;
 }
 
 export function convertOddsInput(
@@ -150,7 +167,7 @@ export function convertOddsInput(
   fromFormat: OddsFormat,
   toFormat: OddsFormat,
 ): string {
-  if (!currentValue || currentValue.trim() === '') return '';
   const decimal = parseInputToDecimal(currentValue, fromFormat);
+  if (decimal === null) return '';
   return formatOdds(decimal, toFormat);
 }

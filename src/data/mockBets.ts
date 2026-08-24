@@ -1,5 +1,11 @@
 import type { Bet, UserStats } from '../types/bet';
 
+// Fechas relativas para que el dataset demo no envejezca
+const hoursAgo = (h: number): string =>
+  new Date(Date.now() - h * 3_600_000).toISOString();
+const hoursFromNow = (h: number): string =>
+  new Date(Date.now() + h * 3_600_000).toISOString();
+
 export const initialStats: UserStats = {
   bankroll: 1845.5,
   initialBankroll: 1200.0,
@@ -32,7 +38,7 @@ export const initialBets: Bet[] = [
       minute: "79'",
       period: '2H',
       status: 'LIVE',
-      startTime: '2026-08-18T21:00:00Z',
+      startTime: hoursAgo(2),
       league: 'UEFA Champions League',
     },
     stake: 50.0,
@@ -41,7 +47,7 @@ export const initialBets: Bet[] = [
     bookmaker: 'Bet365',
     status: 'LIVE',
     cashoutValue: 168.0,
-    createdAt: '2026-08-18T19:30:00Z',
+    createdAt: hoursAgo(2.5),
     tags: ['Champions League', 'BetBuilder', 'HighConfidence'],
     notes:
       'Partido de vuelta semifinales. Madrid atacando por banda izquierda con Vinicius.',
@@ -54,7 +60,7 @@ export const initialBets: Bet[] = [
         currentValue: '2-1 (Gana Real Madrid)',
         progress: 100,
         status: 'MET',
-        isLock: false,
+        isLock: true,
         dangerNote: 'Minuto 79: City presionando',
       },
       {
@@ -107,7 +113,7 @@ export const initialBets: Bet[] = [
       minute: "54'",
       period: '2H',
       status: 'LIVE',
-      startTime: '2026-08-18T20:30:00Z',
+      startTime: hoursAgo(1.5),
       league: 'Premier League',
     },
     stake: 35.0,
@@ -116,7 +122,7 @@ export const initialBets: Bet[] = [
     bookmaker: '1xBet',
     status: 'LIVE',
     cashoutValue: 48.2,
-    createdAt: '2026-08-18T19:00:00Z',
+    createdAt: hoursAgo(2),
     tags: ['PremierLeague', 'Derby'],
     conditions: [
       {
@@ -153,7 +159,7 @@ export const initialBets: Bet[] = [
       homeTeam: 'Boston Celtics',
       awayTeam: 'Dallas Mavericks',
       status: 'SCHEDULED',
-      startTime: '2026-08-19T01:30:00Z',
+      startTime: hoursFromNow(2.5),
       league: 'NBA',
     },
     stake: 40.0,
@@ -161,7 +167,7 @@ export const initialBets: Bet[] = [
     potentialPayout: 144.0,
     bookmaker: 'Codere',
     status: 'PENDING',
-    createdAt: '2026-08-18T22:00:00Z',
+    createdAt: hoursAgo(1),
     tags: ['NBA', 'PlayerProps'],
     conditions: [
       {
@@ -210,7 +216,7 @@ export const initialBets: Bet[] = [
       homeScore: 1,
       awayScore: 0,
       status: 'FINISHED',
-      startTime: '2026-08-17T20:00:00Z',
+      startTime: hoursAgo(26),
       league: 'UEFA Champions League',
     },
     stake: 60.0,
@@ -218,7 +224,7 @@ export const initialBets: Bet[] = [
     potentialPayout: 132.0,
     bookmaker: 'Bet365',
     status: 'WON',
-    createdAt: '2026-08-17T18:00:00Z',
+    createdAt: hoursAgo(28),
     tags: ['ChampionsLeague', 'Inter'],
     conditions: [
       {
@@ -245,7 +251,7 @@ export const initialBets: Bet[] = [
       homeScore: 2,
       awayScore: 2,
       status: 'FINISHED',
-      startTime: '2026-08-16T17:30:00Z',
+      startTime: hoursAgo(50),
       league: 'Bundesliga',
     },
     stake: 25.0,
@@ -253,7 +259,7 @@ export const initialBets: Bet[] = [
     potentialPayout: 130.0,
     bookmaker: 'Stake',
     status: 'LOST',
-    createdAt: '2026-08-16T15:00:00Z',
+    createdAt: hoursAgo(52),
     tags: ['Bundesliga'],
     conditions: [
       {

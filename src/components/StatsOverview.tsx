@@ -5,7 +5,7 @@ export const StatsOverview: React.FC = () => {
   const { stats, currencySymbol } = useBets();
 
   return (
-    <div className='bg-[#12141C] border border-white/10 rounded-lg p-3.5 my-4 flex items-center justify-between gap-2 shadow-sm'>
+    <div className='bg-surface border border-white/10 rounded-lg p-3.5 my-4 flex items-center justify-between gap-2 shadow-sm'>
       {/* Stat 1: Bankroll */}
       <div className='text-left flex-1'>
         <span className='text-[10px] uppercase tracking-wider text-slate-300 font-bold block'>
@@ -13,7 +13,10 @@ export const StatsOverview: React.FC = () => {
         </span>
         <span className='text-lg sm:text-xl font-black text-white font-mono-numbers'>
           {currencySymbol}
-          {stats.bankroll.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {stats.bankroll.toLocaleString('es-AR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </span>
       </div>
 
@@ -26,7 +29,7 @@ export const StatsOverview: React.FC = () => {
         </span>
         <span
           className={`text-lg sm:text-xl font-bold font-mono-numbers ${
-            stats.netProfit >= 0 ? 'text-[#00E676]' : 'text-[#FF3344]'
+            stats.netProfit >= 0 ? 'text-won' : 'text-lost'
           }`}
         >
           {stats.netProfit >= 0 ? '+' : '-'}

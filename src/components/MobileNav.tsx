@@ -11,16 +11,22 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   onOpenAddModal,
   onOpenAnalyticsModal,
 }) => {
-  const { filter, setFilter, isSimulating, toggleSimulation, bets } = useBets();
-  const liveCount = bets.filter((b) => b.status === 'LIVE').length;
+  const { filter, setFilter, isSimulating, toggleSimulation, counts } =
+    useBets();
+  const liveCount = counts.live;
 
   return (
-    <div className='md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0B0C10]/95 backdrop-blur-lg border-t border-white/10 px-3 py-2 flex items-center justify-around'>
+    <nav
+      aria-label='Navegación móvil'
+      className='md:hidden fixed bottom-0 left-0 right-0 z-40 bg-base/95 backdrop-blur-lg border-t border-white/10 px-3 py-2 flex items-center justify-around'
+    >
       {/* Tab 1: Dashboard / Todas */}
       <button
         onClick={() => setFilter('ALL')}
+        aria-label='Ver todas las apuestas'
+        aria-current={filter === 'ALL' ? 'page' : undefined}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
-          filter === 'ALL' ? 'text-[#FF5500]' : 'text-slate-400'
+          filter === 'ALL' ? 'text-brand' : 'text-slate-400'
         }`}
       >
         <LayoutGrid className='w-5 h-5' />
@@ -30,8 +36,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {/* Tab 2: En Vivo */}
       <button
         onClick={() => setFilter('LIVE')}
+        aria-label={`Apuestas en vivo (${liveCount})`}
+        aria-current={filter === 'LIVE' ? 'page' : undefined}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold relative transition-colors ${
-          filter === 'LIVE' ? 'text-[#FF5500]' : 'text-slate-400'
+          filter === 'LIVE' ? 'text-brand' : 'text-slate-400'
         }`}
       >
         <div className='relative'>
@@ -50,8 +58,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {/* Center Action: + Nueva Apuesta */}
       <button
         onClick={onOpenAddModal}
-        className='w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-[#FF5500] to-orange-400 text-white flex items-center justify-center shadow-lg shadow-orange-950/60 border-2 border-[#0B0C10] active:scale-95 transition-all'
-        title='Crear Apuesta'
+        aria-label='Crear apuesta'
+        className='w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-brand to-orange-400 text-white flex items-center justify-center shadow-lg shadow-orange-950/60 border-2 border-base active:scale-95 transition-all'
       >
         <Plus className='w-6 h-6 stroke-[3]' />
       </button>
@@ -59,6 +67,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {/* Tab 3: Métricas */}
       <button
         onClick={onOpenAnalyticsModal}
+        aria-label='Ver métricas'
         className='flex flex-col items-center gap-1 text-[10px] font-mono font-semibold text-slate-400 hover:text-white transition-colors'
       >
         <TrendingUp className='w-5 h-5' />
@@ -68,6 +77,10 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {/* Tab 4: Simulador */}
       <button
         onClick={toggleSimulation}
+        aria-label={
+          isSimulating ? 'Desactivar simulador' : 'Activar simulador'
+        }
+        aria-pressed={isSimulating}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
           isSimulating ? 'text-emerald-400' : 'text-slate-400'
         }`}
@@ -77,6 +90,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         />
         <span>{isSimulating ? 'Sim: ON' : 'Sim: OFF'}</span>
       </button>
-    </div>
+    </nav>
   );
 };

@@ -1,5 +1,16 @@
 @import 'tailwindcss';
 
+@theme {
+  --color-brand: #ff5500;
+  --color-brand-hover: #ff661a;
+  --color-base: #0b0c10;
+  --color-surface: #12141c;
+  --color-panel: #161822;
+  --color-elevated: #1a1d28;
+  --color-won: #00e676;
+  --color-lost: #ff3344;
+}
+
 @layer base {
   :root {
     --bg-main: #0b0c10;

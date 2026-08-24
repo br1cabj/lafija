@@ -1,11 +1,18 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useBets } from '../context/BetContext';
+import { formatConditionValue } from '../types/bet';
 import { Zap, Target, Bell, Flame } from 'lucide-react';
 
 export const LiveFeedSidebar: React.FC = () => {
   const { liveLogs, isSimulating, bets } = useBets();
 
-  const liveBets = bets.filter((b) => b.status === 'LIVE');
+  const { liveBets, pendingConditions } = useMemo(() => {
+    const liveBets = bets.filter((b) => b.status === 'LIVE');
+    const pendingConditions = liveBets.flatMap((b) =>
+      b.conditions.filter((c) => c.status !== 'MET'),
+    );
+    return { liveBets, pendingConditions };
+  }, [bets]);
 
   return (
     <div className='space-y-4'>
@@ -46,7 +53,7 @@ export const LiveFeedSidebar: React.FC = () => {
                       ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
                       : isClutch
                         ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                        : 'bg-[#0B0C10] border-white/5 text-slate-300'
+                        : 'bg-base border-white/5 text-slate-300'
                   }`}
                 >
                   <div className='flex items-center justify-between text-[10px] font-mono mb-1'>
@@ -81,34 +88,28 @@ export const LiveFeedSidebar: React.FC = () => {
               Condiciones Pendientes
             </h4>
             <span className='text-[10px] font-mono text-orange-400 font-bold'>
-              {
-                liveBets
-                  .flatMap((b) => b.conditions)
-                  .filter((c) => c.status !== 'MET').length
-              }{' '}
-              RESTANTES
+              {pendingConditions.length} RESTANTES
             </span>
           </div>
 
           <div className='space-y-2'>
-            {liveBets
-              .flatMap((b) => b.conditions.filter((c) => c.status !== 'MET'))
+            {pendingConditions
               .map((cond) => (
                 <div
                   key={cond.id}
-                  className='p-2 bg-[#0B0C10] rounded border border-white/5 text-xs'
+                  className='p-2 bg-base rounded border border-white/5 text-xs'
                 >
                   <div className='flex justify-between items-center text-slate-300 font-medium'>
                     <span className='truncate max-w-[180px]'>
                       {cond.selection}
                     </span>
                     <span className='text-orange-400 font-mono-numbers font-bold text-[11px]'>
-                      {cond.currentValue}/{cond.targetValue}
+                      {formatConditionValue(cond)}
                     </span>
                   </div>
-                  <div className='w-full bg-[#161822] h-1 rounded-full overflow-hidden mt-1.5'>
+                  <div className='w-full bg-panel h-1 rounded-full overflow-hidden mt-1.5'>
                     <div
-                      className='bg-[#FF5500] h-full rounded-full'
+                      className='bg-brand h-full rounded-full'
                       style={{ width: `${cond.progress}%` }}
                     />
                   </div>
@@ -119,7 +120,7 @@ export const LiveFeedSidebar: React.FC = () => {
       )}
 
       {/* Quick Pro Tips / Anti-Tilt Box */}
-      <div className='p-3.5 rounded bg-gradient-to-br from-[#12141C] to-[#181B26] border border-orange-500/20'>
+      <div className='p-3.5 rounded bg-gradient-to-br from-surface to-[#181B26] border border-orange-500/20'>
         <div className='flex items-center gap-2 text-xs font-bold text-orange-400 uppercase font-mono mb-1'>
           <span>🛡️ Bankroll Guard</span>
         </div>

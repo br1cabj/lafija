@@ -46,12 +46,14 @@ export interface MatchInfo {
   league: string;
 }
 
+export type BetType = 'single' | 'parlay' | 'bet_builder';
+
 export interface Bet {
   id: string;
   title: string;
   sport: SportType;
   league: string;
-  type: 'single' | 'parlay' | 'bet_builder';
+  type: BetType;
   match: MatchInfo;
   stake: number;
   odds: number;
@@ -80,4 +82,27 @@ export interface UserStats {
   winStreak: number;
   faceitLevel: number; // 1 to 10
   eloRating: number;
+}
+
+export interface LiveEventLog {
+  id: string;
+  time: string;
+  betId: string;
+  matchTitle: string;
+  text: string;
+  type: 'GOAL' | 'CORNER' | 'CARD' | 'SHOT' | 'CUMPLIDO' | 'CLUTCH' | 'INFO';
+}
+
+/** Type guard: condición con progreso numérico (vs. resultado textual tipo "1X"). */
+export function isNumericCondition(
+  cond: BetCondition,
+): cond is BetCondition & { targetValue: number; currentValue: number } {
+  return (
+    typeof cond.targetValue === 'number' && typeof cond.currentValue === 'number'
+  );
+}
+
+export function formatConditionValue(cond: BetCondition): string {
+  if (isNumericCondition(cond)) return `${cond.currentValue}/${cond.targetValue}`;
+  return String(cond.currentValue ?? '');
 }
