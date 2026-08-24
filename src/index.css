@@ -9,6 +9,11 @@
   --color-elevated: #1a1d28;
   --color-won: #00e676;
   --color-lost: #ff3344;
+
+  /* Unified radius scale */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
 }
 
 @layer base {
@@ -22,11 +27,10 @@
     --border-active: rgba(255, 85, 0, 0.4);
     --accent-orange: #ff5500;
     --accent-orange-hover: #ff661a;
-    --accent-orange-glow: rgba(255, 85, 0, 0.25);
     --status-won: #00e676;
     --status-lost: #ff3344;
     --status-clutch: #ffb800;
-    --status-live: #00e5ff;
+    --status-live: #ff3344;
     --text-primary: #f3f4f6;
     --text-secondary: #94a3b8;
     --text-muted: #64748b;
@@ -50,12 +54,33 @@
       sans-serif;
     overflow-x: hidden;
     margin: 0;
-    padding: 0;
+    /* Safe area superior (iPhone con notch, display standalone) */
+    padding: env(safe-area-inset-top) 0 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Custom esports sleek scrollbars */
+  /* Evita el zoom automático de iOS al enfocar campos (< 16px) */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Monospace reserved for numeric data */
+  .font-mono-numbers {
+    font-family:
+      'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent-orange);
+    outline-offset: 2px;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -68,19 +93,12 @@
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #ff5500;
+    background: #3a4054;
   }
 }
 
-/* Monospace stats typography */
-.font-mono-numbers {
-  font-family:
-    'JetBrains Mono', 'Fira Code', 'Roboto Mono', ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-}
-
 .panel-card {
-  background: linear-gradient(180deg, #161822 0%, #11131a 100%);
+  background: var(--bg-card);
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
 

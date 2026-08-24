@@ -27,14 +27,13 @@ export const OddsFormatTabs: React.FC<OddsFormatTabsProps> = ({
   onChange,
   variant = 'compact',
 }) => (
-  <div
-    className={clsx(
-      'flex items-center bg-panel border border-white/10 rounded p-0.5 font-mono',
-      variant === 'compact' ? 'text-[11px]' : 'text-[11px]',
-    )}
-    role='tablist'
-    aria-label='Formato de cuota'
-  >
+    <div
+      className={clsx(
+        'flex items-center rounded-sm border border-white/10 bg-panel p-0.5 text-[11px]',
+      )}
+      role='tablist'
+      aria-label='Formato de cuota'
+    >
     {FORMATS.map((f) => (
       <button
         key={f.value}

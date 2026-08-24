@@ -1,27 +1,58 @@
-import React, { useState } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { BetProvider, useBets } from './context/BetContext';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotesProvider } from './context/NotesContext';
 import { Header } from './components/Header';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { StatsOverview } from './components/StatsOverview';
 import { FilterBar } from './components/FilterBar';
 import { BetCard } from './components/BetCard';
-import { AddBetModal } from './components/AddBetModal';
-import { AnalyticsModal } from './components/AnalyticsModal';
-import { AuthModal } from './components/AuthModal';
-import { ShareTicketModal } from './components/ShareTicketModal';
 import { MobileNav } from './components/MobileNav';
 import { LiveFeedSidebar } from './components/LiveFeedSidebar';
-import { NotesView } from './components/notes/NotesView';
 import type { Bet } from './types/bet';
 import { isSupabaseConfigured } from './services/supabase';
 import { Plus, ShieldCheck, Zap } from 'lucide-react';
+import { Button } from './components/ui/Button';
+import { ADS_ENABLED } from './config/ads';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { PWAUpdateToast } from './components/PWAUpdateToast';
+
+/* Modales y vistas secundarias: se descargan solo cuando se usan. */
+const AddBetModal = lazy(() =>
+  import('./components/AddBetModal').then((m) => ({ default: m.AddBetModal })),
+);
+const AnalyticsModal = lazy(() =>
+  import('./components/AnalyticsModal').then((m) => ({
+    default: m.AnalyticsModal,
+  })),
+);
+const AuthModal = lazy(() =>
+  import('./components/AuthModal').then((m) => ({ default: m.AuthModal })),
+);
+const ShareTicketModal = lazy(() =>
+  import('./components/ShareTicketModal').then((m) => ({
+    default: m.ShareTicketModal,
+  })),
+);
+const NotesView = lazy(() =>
+  import('./components/notes/NotesView').then((m) => ({
+    default: m.NotesView,
+  })),
+);
 
 export type AppView = 'dashboard' | 'notes';
 
 const DashboardContent: React.FC = () => {
-  const { bets, filter, searchQuery } = useBets();
+  const {
+    bets,
+    filter,
+    searchQuery,
+    cloudSyncStatus,
+    lastCloudSyncAt,
+    retryCloudSync,
+  } = useBets();
+  const { user } = useAuth();
+  const { isAuthModalOpen } = useAuth();
   const [view, setView] = useState<AppView>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
@@ -69,7 +100,7 @@ const DashboardContent: React.FC = () => {
   });
 
   return (
-    <div className='min-h-screen bg-base text-[#F3F4F6] pb-24 md:pb-12'>
+    <div className='flex min-h-screen flex-col bg-base pb-28 text-[#F3F4F6] md:pb-0'>
       {/* PWA Mobile Install Prompt */}
       <PWAInstallBanner />
 
@@ -82,9 +113,11 @@ const DashboardContent: React.FC = () => {
       />
 
       {/* Main Container */}
-      <main className='max-w-7xl mx-auto px-4 lg:px-8 py-4'>
+      <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-8 lg:py-8'>
         {view === 'notes' ? (
-          <NotesView />
+          <Suspense fallback={null}>
+            <NotesView />
+          </Suspense>
         ) : (
           <>
             {/* Compact 3-Stat Strip */}
@@ -96,39 +129,41 @@ const DashboardContent: React.FC = () => {
                 {/* Minimal Filters */}
                 <FilterBar />
 
-                <div className='flex items-center justify-between mb-2'>
-                  <span className='text-xs font-mono text-slate-400'>
+                <div className='mb-2 flex items-center justify-between'>
+                  <span className='font-mono-numbers text-xs text-slate-500'>
                     {filteredBets.length}{' '}
                     {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
                   </span>
 
-                  <button
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    className='text-brand hover:bg-brand/10 hover:text-brand'
                     onClick={() => setIsAddModalOpen(true)}
-                    className='text-xs font-mono font-bold text-brand hover:text-orange-400 flex items-center gap-1'
                   >
-                    <Plus className='w-3.5 h-3.5' />
-                    <span>Nueva Apuesta</span>
-                  </button>
+                    <Plus className='h-3.5 w-3.5' />
+                    <span>Nueva apuesta</span>
+                  </Button>
                 </div>
 
                 {filteredBets.length === 0 ? (
-                  <div className='bg-surface border border-dashed border-white/10 rounded-lg p-8 text-center'>
-                    <div className='w-10 h-10 rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mx-auto mb-2.5'>
-                      <Zap className='w-5 h-5' />
+                  <div className='rounded-lg border border-dashed border-white/10 bg-surface p-10 text-center'>
+                    <div className='mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10 text-orange-400'>
+                      <Zap className='h-5 w-5' />
                     </div>
-                    <h3 className='text-sm font-bold text-white mb-1'>
+                    <h3 className='mb-1 text-sm font-semibold text-white'>
                       No hay apuestas en esta vista
                     </h3>
-                    <p className='text-xs text-slate-400 mb-3'>
+                    <p className='mb-4 text-xs text-slate-400'>
                       Añade una nueva apuesta para iniciar el seguimiento en
                       vivo.
                     </p>
-                    <button
+                    <Button
+                      variant='secondary'
                       onClick={() => setIsAddModalOpen(true)}
-                      className='px-3.5 py-1.5 bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase rounded shadow'
                     >
-                      + Crear Apuesta
-                    </button>
+                      Crear apuesta
+                    </Button>
                   </div>
                 ) : (
                   filteredBets.map((bet) => (
@@ -152,21 +187,35 @@ const DashboardContent: React.FC = () => {
 
       {/* Modals - AddBetModal se monta fresco en cada apertura */}
       {isAddModalOpen && (
-        <AddBetModal isOpen onClose={() => setIsAddModalOpen(false)} />
+        <Suspense fallback={null}>
+          <AddBetModal isOpen onClose={() => setIsAddModalOpen(false)} />
+        </Suspense>
       )}
 
-      <AnalyticsModal
-        isOpen={isAnalyticsModalOpen}
-        onClose={() => setIsAnalyticsModalOpen(false)}
-      />
+      {isAnalyticsModalOpen && (
+        <Suspense fallback={null}>
+          <AnalyticsModal
+            isOpen
+            onClose={() => setIsAnalyticsModalOpen(false)}
+          />
+        </Suspense>
+      )}
 
-      <ShareTicketModal
-        bet={selectedBetForShare}
-        isOpen={Boolean(selectedBetForShare)}
-        onClose={() => setSelectedBetForShare(null)}
-      />
+      {selectedBetForShare && (
+        <Suspense fallback={null}>
+          <ShareTicketModal
+            bet={selectedBetForShare}
+            isOpen
+            onClose={() => setSelectedBetForShare(null)}
+          />
+        </Suspense>
+      )}
 
-      <AuthModal />
+      {isAuthModalOpen && (
+        <Suspense fallback={null}>
+          <AuthModal />
+        </Suspense>
+      )}
 
       {/* Mobile Bottom HUD Nav */}
       <MobileNav
@@ -176,32 +225,69 @@ const DashboardContent: React.FC = () => {
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
       />
 
+      {/* Aviso de nueva versión del PWA */}
+      <PWAUpdateToast />
+
       {/* Footer */}
-      <footer className='max-w-7xl mx-auto px-4 lg:px-8 mt-12 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2'>
-        <div className='flex items-center gap-2'>
-          <span className='font-bold text-slate-400 uppercase tracking-wider font-mono'>
-            LA FIJA v2.0
-          </span>
-          <span>•</span>
-          <span>Tracker de Apuestas en Vivo</span>
-        </div>
-        <div className='flex items-center gap-2 text-[11px] font-mono'>
-          {isSupabaseConfigured ? (
+      <footer className='mt-auto border-t border-white/5 bg-base/95 px-4 py-4 lg:px-8'>
+        <div className='mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 text-xs text-slate-500 sm:flex-row'>
+          <div className='flex items-center gap-2'>
+            <span className='font-semibold tracking-wider text-slate-400 uppercase'>
+              LA FIJA v2.0
+            </span>
+            <span>·</span>
+            <span>Tracker de apuestas en vivo</span>
+          </div>
+          <div className='flex items-center gap-2 text-[11px]'>
+          {isSupabaseConfigured && user && !user.isGuest ? (
             <>
-              <span className='flex items-center gap-1 text-emerald-400'>
-                <ShieldCheck className='w-3.5 h-3.5' /> Sync en la nube
-              </span>
-              <span>•</span>
+              {cloudSyncStatus === 'error' ? (
+                <button
+                  onClick={retryCloudSync}
+                  className='flex items-center gap-1.5 text-amber-400 transition-colors hover:text-amber-300'
+                  title='Reintentar sincronización'
+                >
+                  <span className='h-1.5 w-1.5 rounded-full bg-amber-400' />
+                  Error de sync · Reintentar
+                </button>
+              ) : cloudSyncStatus === 'syncing' ? (
+                <span className='flex items-center gap-1.5 text-slate-400'>
+                  <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400' />
+                  Sincronizando…
+                </span>
+              ) : (
+                <span
+                  className='flex items-center gap-1.5 text-emerald-400'
+                  title={
+                    lastCloudSyncAt
+                      ? `Última sincronización: ${new Date(lastCloudSyncAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+                      : undefined
+                  }
+                >
+                  <span className='h-1.5 w-1.5 rounded-full bg-emerald-400' />
+                  {lastCloudSyncAt
+                    ? `Sincronizado ${new Date(lastCloudSyncAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Sincronización activa'}
+                </span>
+              )}
+              <span>·</span>
             </>
           ) : (
             <>
-              <span className='flex items-center gap-1 text-slate-400'>
-                <ShieldCheck className='w-3.5 h-3.5' /> Modo local
+              <span className='flex items-center gap-1.5 text-slate-400'>
+                <ShieldCheck className='h-3.5 w-3.5' /> Modo local
               </span>
-              <span>•</span>
+              <span>·</span>
             </>
           )}
           <span>Instalable (PWA)</span>
+          {ADS_ENABLED && (
+            <>
+              <span>·</span>
+              <span>Contiene enlaces de afiliados</span>
+            </>
+          )}
+          </div>
         </div>
       </footer>
     </div>
@@ -210,13 +296,15 @@ const DashboardContent: React.FC = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <BetProvider>
-        <NotesProvider>
-          <DashboardContent />
-        </NotesProvider>
-      </BetProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BetProvider>
+          <NotesProvider>
+            <DashboardContent />
+          </NotesProvider>
+        </BetProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

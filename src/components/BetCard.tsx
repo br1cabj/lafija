@@ -4,6 +4,7 @@ import { formatConditionValue } from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
+import { Badge } from './ui/Badge';
 import {
   CheckCircle2,
   XCircle,
@@ -50,7 +51,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
       ? Math.round((metConditions / totalConditions) * 100)
       : 0;
 
-  // "A 1 DEL COBRO" / MATCH POINT ALERT
+  // Alerta de match point: falta una sola condición para el cobro
   const isMatchPoint =
     bet.status === 'LIVE' && totalConditions >= 2 && pendingConditions === 1;
 
@@ -58,115 +59,110 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
 
   return (
     <div
-      className={`bg-surface rounded-lg p-3.5 sm:p-4 lg:p-5 mb-3 transition-all relative ${
+      className={`relative mb-3 rounded-lg border bg-surface p-4 transition-colors duration-150 lg:p-5 ${
         isMatchPoint
-          ? 'border-2 border-orange-500 shadow-lg shadow-orange-950/60 ring-1 ring-orange-500/40'
-          : 'border border-white/10 hover:border-white/20'
+          ? 'border-white/10 border-l-2 border-l-brand'
+          : 'border-white/10 hover:border-white/20'
       }`}
     >
-      {/* Top Header: Teams, Live Status & Match Point Badge */}
-      <div className='flex items-center justify-between gap-2 mb-2.5'>
-        <div className='flex items-center gap-1.5 flex-wrap'>
+      {/* Meta row: estado, liga y bookmaker */}
+      <div className='mb-3 flex items-center justify-between gap-2'>
+        <div className='flex flex-wrap items-center gap-1.5'>
           {bet.status === 'LIVE' && (
-            <span className='flex items-center gap-1 text-[11px] font-mono font-bold text-red-400 bg-red-950/60 border border-red-500/40 px-2 py-0.5 rounded'>
-              <span className='w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse' />
-              {bet.match.minute || 'LIVE'}
-            </span>
+            <Badge variant='live' dot pulse>
+              {bet.match.minute || 'En vivo'}
+            </Badge>
           )}
 
-          {/* 🔥 "A 1 DEL COBRO" (MATCH POINT) BADGE */}
           {isMatchPoint && (
-            <span className='flex items-center gap-1 text-[11px] font-mono font-black text-amber-300 bg-gradient-to-r from-amber-950/90 to-orange-950/90 border border-amber-500/60 px-2 py-0.5 rounded shadow-sm animate-pulse'>
-              <Flame className='w-3 h-3 text-orange-400 fill-orange-400' />
-              ¡A 1 DEL COBRO!
-            </span>
+            <Badge variant='clutch'>
+              <Flame className='h-3 w-3 fill-current' />
+              A 1 del cobro
+            </Badge>
           )}
 
           {bet.status === 'PENDING' && (
-            <span className='flex items-center gap-1 text-[11px] font-mono text-slate-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded'>
-              <Clock className='w-3 h-3 text-slate-400' />
-              Próximo
-            </span>
+            <Badge variant='pending'>
+              <Clock className='h-3 w-3' />
+              Próxima
+            </Badge>
           )}
 
           {bet.status === 'WON' && (
-            <span className='flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded'>
-              <CheckCircle2 className='w-3.5 h-3.5' />
-              GANADA (+{currencySymbol}
-              {(bet.potentialPayout - bet.stake).toFixed(2)})
-            </span>
+            <Badge variant='won'>
+              <CheckCircle2 className='h-3 w-3' />
+              Ganada +{currencySymbol}
+              {(bet.potentialPayout - bet.stake).toFixed(2)}
+            </Badge>
           )}
 
           {bet.status === 'LOST' && (
-            <span className='flex items-center gap-1 text-[11px] font-mono font-bold text-red-400 bg-red-950/60 border border-red-500/30 px-2 py-0.5 rounded'>
-              <XCircle className='w-3.5 h-3.5' />
-              PERDIDA
-            </span>
+            <Badge variant='lost'>
+              <XCircle className='h-3 w-3' />
+              Perdida
+            </Badge>
           )}
 
           {bet.status === 'CASHOUT' && (
-            <span className='text-[11px] font-mono font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2 py-0.5 rounded'>
-              CASHOUT ({currencySymbol}
+            <Badge variant='cashout'>
+              Retirada ({currencySymbol}
               {bet.cashoutValue?.toFixed(2)})
-            </span>
+            </Badge>
           )}
 
-          <span className='text-xs text-slate-300 truncate max-w-[130px] sm:max-w-none'>
-            {bet.league}
-          </span>
-          <span className='text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-orange-400 font-bold'>
+          <span className='truncate text-xs text-slate-400'>{bet.league}</span>
+          <Badge variant='neutral' className='!px-1.5 !text-[10px]'>
             {bet.bookmaker}
-          </span>
+          </Badge>
         </div>
 
-        {/* Header Right: Share, Collapse & More Actions */}
-        <div className='flex items-center gap-1 shrink-0'>
+        {/* Acciones: compartir, plegar, menú */}
+        <div className='flex shrink-0 items-center gap-1'>
           <button
             onClick={() => onShare(bet)}
             aria-label='Exportar tarjeta visual para redes'
-            className='p-1.5 text-slate-300 hover:text-brand rounded bg-white/5 hover:bg-white/10 transition-colors'
+            className='rounded-md p-1.5 text-slate-400 transition-colors duration-150 hover:bg-white/5 hover:text-white'
           >
-            <Share2 className='w-3.5 h-3.5' />
+            <Share2 className='h-4 w-4' />
           </button>
 
-          {/* Collapse/Expand Toggle */}
           <button
             onClick={toggleCollapse}
             aria-expanded={!isCollapsed}
             aria-label={
               isCollapsed ? 'Expandir condiciones' : 'Plegar condiciones'
             }
-            className='p-1.5 text-slate-300 hover:text-white rounded bg-white/5 hover:bg-white/10 transition-colors'
+            className='rounded-md p-1.5 text-slate-400 transition-colors duration-150 hover:bg-white/5 hover:text-white'
           >
             {isCollapsed ? (
-              <ChevronDown className='w-3.5 h-3.5' />
+              <ChevronDown className='h-4 w-4' />
             ) : (
-              <ChevronUp className='w-3.5 h-3.5' />
+              <ChevronUp className='h-4 w-4' />
             )}
           </button>
 
-          {/* More Menu Dropdown */}
           <div className='relative' ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               aria-label='Más acciones'
               aria-expanded={showMenu}
-              className='p-1.5 text-slate-400 hover:text-white rounded bg-white/5 hover:bg-white/10'
+              className='rounded-md p-1.5 text-slate-400 transition-colors duration-150 hover:bg-white/5 hover:text-white'
             >
-              <MoreVertical className='w-3.5 h-3.5' />
+              <MoreVertical className='h-4 w-4' />
             </button>
 
             {showMenu && (
-              <div className='absolute right-0 top-7 z-20 bg-elevated border border-white/15 rounded-md shadow-2xl py-1 w-44 text-xs text-slate-200'>
+              <div className='absolute right-0 top-9 z-20 w-44 rounded-lg border border-white/15 bg-elevated py-1 text-xs shadow-2xl'>
                 {bet.status === 'PENDING' && (
                   <button
                     onClick={() => {
                       setBetStatus(bet.id, 'LIVE');
                       setShowMenu(false);
                     }}
-                    className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-brand flex items-center gap-1.5 font-semibold'
+                    className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                   >
-                    <Play className='w-3.5 h-3.5' /> Iniciar En Vivo
+                    <Play className='h-3.5 w-3.5 text-red-400' /> Pasar a en
+                    vivo
                   </button>
                 )}
 
@@ -177,27 +173,30 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                         settleBet(bet.id, 'WON');
                         setShowMenu(false);
                       }}
-                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-emerald-400 flex items-center gap-1.5 font-semibold'
+                      className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                     >
-                      <Trophy className='w-3.5 h-3.5' /> Ganada
+                      <Trophy className='h-3.5 w-3.5 text-emerald-400' />{' '}
+                      Marcar ganada
                     </button>
                     <button
                       onClick={() => {
                         settleBet(bet.id, 'LOST');
                         setShowMenu(false);
                       }}
-                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-red-400 flex items-center gap-1.5 font-semibold'
+                      className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                     >
-                      <XCircle className='w-3.5 h-3.5' /> Perdida
+                      <XCircle className='h-3.5 w-3.5 text-red-400' /> Marcar
+                      perdida
                     </button>
                     <button
                       onClick={() => {
                         setBetStatus(bet.id, 'PENDING');
                         setShowMenu(false);
                       }}
-                      className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-slate-300 flex items-center gap-1.5'
+                      className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                     >
-                      <Clock className='w-3.5 h-3.5' /> Pausar (Pre-Match)
+                      <Clock className='h-3.5 w-3.5 text-slate-400' /> Pausar
+                      (pre-partido)
                     </button>
                   </>
                 )}
@@ -210,9 +209,10 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                       setBetStatus(bet.id, 'LIVE');
                       setShowMenu(false);
                     }}
-                    className='w-full text-left px-3 py-1.5 hover:bg-white/10 text-cyan-400 flex items-center gap-1.5 font-semibold'
+                    className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                   >
-                    <RotateCcw className='w-3.5 h-3.5' /> Reactivar a En Vivo
+                    <RotateCcw className='h-3.5 w-3.5 text-cyan-400' />{' '}
+                    Reactivar a en vivo
                   </button>
                 )}
 
@@ -221,9 +221,9 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                     deleteBet(bet.id);
                     setShowMenu(false);
                   }}
-                  className='w-full text-left px-3 py-1.5 hover:bg-red-950/50 text-red-400 flex items-center gap-1.5 border-t border-white/10 font-semibold'
+                  className='flex w-full items-center gap-2 border-t border-white/10 px-3 py-2 text-left text-red-400 transition-colors hover:bg-red-950/40'
                 >
-                  <Trash2 className='w-3.5 h-3.5' /> Eliminar
+                  <Trash2 className='h-3.5 w-3.5' /> Eliminar
                 </button>
               </div>
             )}
@@ -231,58 +231,58 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
         </div>
       </div>
 
-      {/* Match Title & Score - clickable collapse toggle */}
+      {/* Título del partido */}
       <button
         type='button'
         onClick={toggleCollapse}
         aria-expanded={!isCollapsed}
-        className='w-full flex items-baseline justify-between mb-2.5 cursor-pointer select-none text-left'
+        className='mb-3 flex w-full cursor-pointer select-none items-baseline justify-between gap-2 text-left'
       >
-        <h3 className='text-base lg:text-lg font-bold text-white tracking-tight flex items-center gap-2'>
+        <h3 className='flex items-center gap-2 text-base font-semibold tracking-tight text-white lg:text-lg'>
           <span>{bet.match.homeTeam}</span>
           {bet.match.homeScore !== undefined && (
-            <span className='font-mono text-orange-400 font-extrabold text-xs px-1.5 py-0.5 bg-black/60 border border-orange-500/30 rounded'>
+            <span className='font-mono-numbers rounded-sm border border-white/10 bg-base px-1.5 py-0.5 text-xs font-bold text-orange-400'>
               {bet.match.homeScore} - {bet.match.awayScore}
             </span>
           )}
-          <span className='text-slate-400 font-normal text-xs'>vs</span>
+          <span className='text-xs font-normal text-slate-500'>vs</span>
           <span>{bet.match.awayTeam}</span>
         </h3>
       </button>
 
-      {/* Clean Financial Strip */}
-      <div className='bg-[#08090D] px-3 py-2 rounded-lg border border-white/5 flex items-center justify-between text-xs lg:text-sm font-mono mb-2.5'>
+      {/* Strip financiero */}
+      <div className='font-mono-numbers mb-3 flex items-center justify-between rounded-md border border-white/5 bg-base px-3 py-2 text-sm'>
         <div>
-          <span className='text-slate-400 text-[10px] uppercase font-bold block'>
+          <span className='block text-[10px] font-medium tracking-wide text-slate-500 uppercase'>
             Stake
           </span>
-          <span className='font-bold text-white text-xs'>
+          <span className='text-xs font-bold text-white'>
             {currencySymbol}
             {bet.stake.toFixed(2)}
           </span>
         </div>
         <div className='text-center'>
-          <span className='text-slate-400 text-[10px] uppercase font-bold block'>
+          <span className='block text-[10px] font-medium tracking-wide text-slate-500 uppercase'>
             Cuota ({ODDS_FORMAT_SHORT[oddsFormat]})
           </span>
-          <span className='font-black text-orange-400 text-xs'>
+          <span className='text-xs font-bold text-orange-400'>
             {formatOdds(bet.odds, oddsFormat)}
           </span>
         </div>
         <div className='text-right'>
-          <span className='text-slate-400 text-[10px] uppercase font-bold block'>
+          <span className='block text-[10px] font-medium tracking-wide text-slate-500 uppercase'>
             Retorno
           </span>
-          <span className='font-black text-emerald-400 text-xs'>
+          <span className='text-xs font-bold text-emerald-400'>
             {currencySymbol}
             {bet.potentialPayout.toFixed(2)}
           </span>
         </div>
       </div>
 
-      {/* Conditions Checklist (Collapsed vs Full View) */}
+      {/* Condiciones */}
       {!isCollapsed ? (
-        <ul className='space-y-2 mb-3'>
+        <ul className='mb-3 space-y-2'>
           {bet.conditions.map((cond: BetCondition) => {
             const isMet = cond.status === 'MET';
             const isBusted = cond.status === 'BUSTED';
@@ -292,68 +292,67 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
               <li
                 key={cond.id}
                 title={cond.dangerNote}
-                className={`p-2.5 rounded-lg text-xs lg:text-sm transition-colors flex items-center justify-between gap-2 border ${
+                className={`flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm transition-colors ${
                   isMet
-                    ? 'bg-emerald-950/30 border-emerald-500/30'
+                    ? 'border-emerald-500/25 bg-emerald-500/5'
                     : isBusted
-                      ? 'bg-red-950/30 border-red-500/30'
+                      ? 'border-red-500/25 bg-red-500/5'
                       : isClutch
-                        ? 'bg-amber-950/30 border-amber-500/40'
-                        : 'bg-panel border-white/10'
+                        ? 'border-amber-500/30 bg-amber-500/5'
+                        : 'border-white/10 bg-panel'
                 }`}
               >
-                <div className='flex items-center gap-2 min-w-0'>
+                <div className='flex min-w-0 items-center gap-2.5'>
                   {isMet ? (
-                    <CheckCircle2 className='w-4 h-4 text-emerald-400 shrink-0' />
+                    <CheckCircle2 className='h-4 w-4 shrink-0 text-emerald-400' />
                   ) : isBusted ? (
-                    <XCircle className='w-4 h-4 text-red-400 shrink-0' />
+                    <XCircle className='h-4 w-4 shrink-0 text-red-400' />
                   ) : isClutch ? (
-                    <Flame className='w-4 h-4 text-amber-400 fill-amber-400 shrink-0 animate-pulse' />
+                    <Flame className='h-4 w-4 shrink-0 fill-current text-amber-400' />
                   ) : (
-                    <div className='w-4 h-4 rounded-full border-2 border-slate-500 shrink-0' />
+                    <Clock className='h-4 w-4 shrink-0 text-slate-500' />
                   )}
                   <span
-                    className={`truncate font-semibold ${
+                    className={`truncate font-medium ${
                       isMet
-                        ? 'text-emerald-200'
+                        ? 'text-emerald-300'
                         : isBusted
-                          ? 'text-red-200 line-through'
+                          ? 'text-red-300 line-through decoration-red-400/50'
                           : isClutch
-                            ? 'text-amber-200'
-                            : 'text-slate-100'
+                            ? 'text-amber-300'
+                            : 'text-slate-200'
                     }`}
                   >
                     {cond.selection}
                   </span>
                 </div>
 
-                {/* Progress Count & Fat-Finger Friendly Touch Controls */}
-                <div className='flex items-center gap-2 shrink-0 font-mono'>
+                {/* Valor actual y controles +/- */}
+                <div className='font-mono-numbers flex shrink-0 items-center gap-2'>
                   <span
-                    className={`text-xs lg:text-sm font-black ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
+                    className={`text-sm font-bold ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
                   >
                     {formatConditionValue(cond)}
                   </span>
 
-                  {/* Big Touch Targets for Mobile + / - */}
                   {typeof cond.currentValue === 'number' &&
                     bet.status === 'LIVE' &&
                     !isMet &&
                     !isBusted && (
-                      <div className='flex items-center gap-1 bg-black/60 p-1 rounded-lg border border-white/10'>
+                      <div className='flex items-center gap-1 rounded-md border border-white/10 bg-black/40 p-0.5'>
                         <button
                           onClick={() => updateCondition(bet.id, cond.id, -1)}
                           aria-label={`Restar 1 a ${cond.selection}`}
-                          className='w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-[0.85] text-slate-200 rounded-md transition-transform'
+                          className='flex h-7 w-7 items-center justify-center rounded-sm text-slate-300 transition-colors duration-150 hover:bg-white/10 hover:text-white'
                         >
-                          <Minus className='w-3.5 h-3.5' />
+                          <Minus className='h-3.5 w-3.5' />
                         </button>
                         <button
                           onClick={() => updateCondition(bet.id, cond.id, 1)}
                           aria-label={`Sumar 1 a ${cond.selection}`}
-                          className='w-7 h-7 flex items-center justify-center bg-brand hover:bg-brand-hover active:scale-[0.85] text-white rounded-md font-bold shadow-md transition-transform'
+                          className='flex h-7 w-7 items-center justify-center rounded-sm bg-brand text-white transition-colors duration-150 hover:bg-brand-hover'
                         >
-                          <Plus className='w-3.5 h-3.5' />
+                          <Plus className='h-3.5 w-3.5' />
                         </button>
                       </div>
                     )}
@@ -363,59 +362,72 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
           })}
         </ul>
       ) : (
-        /* Slim Collapsed Summary */
-        <div className='mb-2 px-2 py-1.5 bg-white/5 rounded text-[11px] font-mono text-slate-300 flex items-center justify-between'>
-          <span className='truncate'>
-            {bet.conditions
-              .map((c) =>
+        /* Resumen plegado */
+        <div className='mb-2 flex items-center justify-between gap-2 rounded-md border border-white/5 bg-panel px-2.5 py-1.5 text-xs text-slate-300'>
+          <span className='flex min-w-0 items-center gap-1.5 truncate'>
+            {bet.conditions.map((c) => {
+              const Icon =
                 c.status === 'MET'
-                  ? '✅'
+                  ? CheckCircle2
                   : c.status === 'BUSTED'
-                    ? '❌'
+                    ? XCircle
                     : c.status === 'CLUTCH_DANGER'
-                      ? '🔥'
-                      : '⏳',
-              )
-              .join(' ')}{' '}
-            {' • '}
-            {bet.conditions.map((c) => c.selection).join(' • ')}
+                      ? Flame
+                      : Clock;
+              return (
+                <Icon
+                  key={c.id}
+                  className={`h-3.5 w-3.5 shrink-0 ${
+                    c.status === 'MET'
+                      ? 'text-emerald-400'
+                      : c.status === 'BUSTED'
+                        ? 'text-red-400'
+                        : c.status === 'CLUTCH_DANGER'
+                          ? 'fill-current text-amber-400'
+                          : 'text-slate-500'
+                  }`}
+                />
+              );
+            })}
+            <span className='ml-1 truncate'>
+              {bet.conditions.map((c) => c.selection).join(' · ')}
+            </span>
           </span>
-          <span className='text-brand font-bold ml-2 shrink-0'>
+          <span className='font-mono-numbers shrink-0 font-semibold text-slate-400'>
             {metConditions}/{totalConditions}
           </span>
         </div>
       )}
 
-      {/* Progress Bar & Cashout footer */}
-      <div className='flex items-center justify-between gap-3 pt-2 border-t border-white/10'>
-        <div className='flex items-center gap-2 flex-1'>
-          <div className='w-24 bg-[#08090D] h-2 rounded-full overflow-hidden border border-white/5'>
+      {/* Footer: progreso y cashout */}
+      <div className='flex items-center justify-between gap-3 border-t border-white/10 pt-3'>
+        <div className='flex flex-1 items-center gap-2.5'>
+          <div
+            role='progressbar'
+            aria-valuenow={globalProgress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label='Progreso de condiciones'
+            className='h-1.5 w-full max-w-32 overflow-hidden rounded-full bg-black/50'
+          >
             <div
-              role='progressbar'
-              aria-valuenow={globalProgress}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label='Progreso de condiciones'
               className={`h-full rounded-full transition-all duration-300 ${
-                isMatchPoint
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-400'
-                  : 'bg-emerald-500'
+                isMatchPoint ? 'bg-brand' : 'bg-emerald-500'
               }`}
               style={{ width: `${globalProgress}%` }}
             />
           </div>
-          <span className='text-[11px] font-mono font-bold text-slate-300'>
-            {metConditions}/{totalConditions}{' '}
-            {globalProgress === 100 ? '✔' : ''}
+          <span className='font-mono-numbers text-xs font-semibold text-slate-400'>
+            {metConditions}/{totalConditions}
           </span>
         </div>
 
         {bet.status === 'LIVE' && bet.cashoutValue && (
           <button
             onClick={() => cashoutBet(bet.id)}
-            className='bg-brand hover:bg-brand-hover text-white font-mono font-black text-xs px-3.5 py-1.5 rounded-lg shadow-md shadow-orange-950/60 active:scale-95 transition-all'
+            className='font-mono-numbers rounded-md bg-brand px-3.5 py-1.5 text-xs font-bold text-white transition-colors duration-150 hover:bg-brand-hover'
           >
-            Cashout {currencySymbol}
+            Retirar {currencySymbol}
             {bet.cashoutValue.toFixed(2)}
           </button>
         )}

@@ -5,13 +5,13 @@ export const StatsOverview: React.FC = () => {
   const { stats, currencySymbol } = useBets();
 
   return (
-    <div className='bg-surface border border-white/10 rounded-lg p-3.5 my-4 flex items-center justify-between gap-2 shadow-sm'>
-      {/* Stat 1: Bankroll */}
-      <div className='text-left flex-1'>
-        <span className='text-[10px] uppercase tracking-wider text-slate-300 font-bold block'>
+    <div className='my-4 flex items-center justify-between gap-4 rounded-lg border border-white/10 bg-surface px-5 py-4'>
+      {/* Bankroll */}
+      <div className='flex-1'>
+        <span className='mb-0.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
           Bankroll
         </span>
-        <span className='text-lg sm:text-xl font-black text-white font-mono-numbers'>
+        <span className='font-mono-numbers text-xl font-bold text-white sm:text-2xl'>
           {currencySymbol}
           {stats.bankroll.toLocaleString('es-AR', {
             minimumFractionDigits: 2,
@@ -20,15 +20,15 @@ export const StatsOverview: React.FC = () => {
         </span>
       </div>
 
-      <div className='h-8 w-px bg-white/10' />
+      <div className='h-10 w-px bg-white/10' />
 
-      {/* Stat 2: Beneficio */}
-      <div className='text-center flex-1'>
-        <span className='text-[10px] uppercase tracking-wider text-slate-300 font-bold block'>
-          Ganancia ({stats.roi >= 0 ? `+${stats.roi}%` : `${stats.roi}%`})
+      {/* Ganancia */}
+      <div className='flex-1 text-center'>
+        <span className='mb-0.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
+          Ganancia · ROI {stats.roi >= 0 ? `+${stats.roi}%` : `${stats.roi}%`}
         </span>
         <span
-          className={`text-lg sm:text-xl font-bold font-mono-numbers ${
+          className={`font-mono-numbers text-xl font-bold sm:text-2xl ${
             stats.netProfit >= 0 ? 'text-won' : 'text-lost'
           }`}
         >
@@ -38,21 +38,21 @@ export const StatsOverview: React.FC = () => {
         </span>
       </div>
 
-      <div className='h-8 w-px bg-white/10' />
+      <div className='h-10 w-px bg-white/10' />
 
-      {/* Stat 3: En Vivo */}
-      <div className='text-right flex-1'>
-        <span className='text-[10px] uppercase tracking-wider text-slate-400 font-medium block'>
-          En Vivo
+      {/* En vivo */}
+      <div className='flex-1 text-right'>
+        <span className='mb-0.5 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
+          En vivo
         </span>
-        <div className='flex items-center justify-end gap-1.5'>
+        <div className='flex items-center justify-end gap-2'>
           {stats.liveBets > 0 && (
-            <span className='w-2 h-2 rounded-full bg-red-500 animate-pulse' />
+            <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-red-500' />
           )}
-          <span className='text-lg sm:text-xl font-bold text-white font-mono-numbers'>
-            {stats.liveBets}{' '}
-            <span className='text-xs text-slate-400 font-normal'>activas</span>
+          <span className='font-mono-numbers text-xl font-bold text-white sm:text-2xl'>
+            {stats.liveBets}
           </span>
+          <span className='text-xs text-slate-400'>activas</span>
         </div>
       </div>
     </div>

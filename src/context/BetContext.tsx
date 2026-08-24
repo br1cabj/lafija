@@ -9,6 +9,7 @@ import React, {
   type ReactNode,
 } from 'react';
 import type { Bet, UserStats, LiveEventLog } from '../types/bet';
+import type { Note } from '../types/note';
 import type { OddsFormat } from '../utils/odds';
 import { sounds } from '../utils/audio';
 import { computeUserStats } from '../utils/stats';
@@ -35,6 +36,8 @@ export interface BetCounts {
   cashout: number;
 }
 
+export type CloudSyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+
 interface BetContextType {
   bets: Bet[];
   stats: UserStats;
@@ -60,6 +63,11 @@ interface BetContextType {
   lastSyncAt: string | null;
   syncLiveData: () => Promise<void>;
   liveLogs: LiveEventLog[];
+  /** Estado de la sincronización con la nube (Supabase). */
+  cloudSyncStatus: CloudSyncStatus;
+  lastCloudSyncAt: string | null;
+  retryCloudSync: () => void;
+  exportBackup: () => void;
   addBet: (betData: Omit<Bet, 'id' | 'createdAt'>) => void;
   deleteBet: (id: string) => void;
   clearAllBets: () => void;
@@ -202,35 +210,94 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
   const cloudUserId =
     user && !user.isGuest && canSyncToCloud() ? user.id : null;
 
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<CloudSyncStatus>('idle');
+  const [lastCloudSyncAt, setLastCloudSyncAt] = useState<string | null>(null);
+
   // Pull remote bets once per logged-in user; remote wins over local draft.
   const [syncedUserId, setSyncedUserId] = useState<string | null>(null);
   const syncReady = Boolean(cloudUserId) && syncedUserId === cloudUserId;
   useEffect(() => {
     if (!cloudUserId) return;
     let cancelled = false;
-    fetchRemoteBets(cloudUserId).then((remoteBets) => {
-      if (cancelled) return;
-      if (remoteBets.length > 0) {
-        setBets(remoteBets);
-      } else {
-        // First login: seed the cloud account with local data.
-        syncBetsToCloud(cloudUserId, betsRef.current).catch(() => {});
-      }
-      setSyncedUserId(cloudUserId);
-    });
+    fetchRemoteBets(cloudUserId)
+      .then((remoteBets) => {
+        if (cancelled) return;
+        if (remoteBets.length > 0) {
+          setBets(remoteBets);
+        } else {
+          // First login: seed the cloud account with local data.
+          syncBetsToCloud(cloudUserId, betsRef.current).catch(() => {
+            setCloudSyncStatus('error');
+          });
+        }
+        setSyncedUserId(cloudUserId);
+        setCloudSyncStatus('synced');
+        setLastCloudSyncAt(new Date().toISOString());
+      })
+      .catch(() => {
+        if (!cancelled) setCloudSyncStatus('error');
+        setSyncedUserId(cloudUserId);
+      });
     return () => {
       cancelled = true;
     };
   }, [cloudUserId]);
 
+  // Push de cada cambio local (con debounce) mientras hay sesión.
+  const pushToCloud = useCallback(async () => {
+    if (!cloudUserId || !syncReady) return;
+    setCloudSyncStatus('syncing');
+    try {
+      await syncBetsToCloud(cloudUserId, betsRef.current);
+      setCloudSyncStatus('synced');
+      setLastCloudSyncAt(new Date().toISOString());
+    } catch {
+      setCloudSyncStatus('error');
+    }
+  }, [cloudUserId, syncReady]);
+
   // Debounced push of every local change while signed in.
   useEffect(() => {
     if (!cloudUserId || !syncReady) return;
     const timer = setTimeout(() => {
-      syncBetsToCloud(cloudUserId, bets).catch(() => {});
+      void pushToCloud();
     }, 800);
     return () => clearTimeout(timer);
-  }, [bets, cloudUserId, syncReady]);
+  }, [bets, cloudUserId, syncReady, pushToCloud]);
+
+  const retryCloudSync = useCallback(() => {
+    void pushToCloud();
+  }, [pushToCloud]);
+
+  /** Descarga un backup JSON con apuestas, notas y ajustes. */
+  const exportBackup = useCallback(() => {
+    let notes: Note[] = [];
+    try {
+      const saved = localStorage.getItem('lafija_notes_v1');
+      if (saved) notes = JSON.parse(saved) as Note[];
+    } catch {
+      // notas ilegibles: se exportan vacías
+    }
+    const backup = {
+      app: 'LA FIJA',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      bets: betsRef.current,
+      notes,
+      initialBankroll,
+      currency,
+      oddsFormat,
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `lafija-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, [initialBankroll, currency, oddsFormat]);
 
   // Derived stats & counts (single source of truth)
   const stats = useMemo(
@@ -506,6 +573,10 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
         lastSyncAt,
         syncLiveData,
         liveLogs,
+        cloudSyncStatus,
+        lastCloudSyncAt,
+        retryCloudSync,
+        exportBackup,
         addBet,
         deleteBet,
         clearAllBets,

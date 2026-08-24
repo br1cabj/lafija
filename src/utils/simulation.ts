@@ -81,7 +81,7 @@ export function tickLiveBets(prevBets: Bet[]): SimulationResult {
                 bet.id,
                 matchTitle,
                 `${newMin}'`,
-                `⚡ Progreso en ${cond.market}: ${nextVal}/${cond.targetValue} ${cond.unit || ''}`,
+                `Progreso en ${cond.market}: ${nextVal}/${cond.targetValue} ${cond.unit || ''}`,
                 'CORNER',
               ),
             );
@@ -107,7 +107,7 @@ export function tickLiveBets(prevBets: Bet[]): SimulationResult {
         return {
           ...cond,
           status: 'CLUTCH_DANGER' as const,
-          dangerNote: `⚠️ TIEMPO CRÍTICO: ${newMin}' - Faltan condiciones`,
+          dangerNote: `Tiempo crítico: min ${newMin}' — faltan condiciones`,
         };
       }
 

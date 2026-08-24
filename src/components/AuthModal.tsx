@@ -53,10 +53,13 @@ export const AuthModal: React.FC = () => {
       maxWidthClass='max-w-md'
     >
       {/* Brand Header */}
-      <div className='text-center mb-5'>
-        <div className='w-10 h-10 rounded bg-brand text-white flex items-center justify-center font-black text-lg mx-auto mb-2 shadow-lg shadow-orange-950/60'>
-          LF
-        </div>
+      <div className='mb-5 text-center'>
+        <img
+          src='/icons/logo.png'
+          alt='LA FIJA'
+          className='mx-auto mb-2 h-14 w-14 object-contain'
+          draggable={false}
+        />
         <h2 className='text-xl font-bold text-white tracking-tight font-mono'>
           {mode === 'LOGIN' ? 'INICIAR SESIÓN' : 'CREAR CUENTA'}
         </h2>

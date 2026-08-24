@@ -6,6 +6,16 @@ import { formatOdds, type OddsFormat } from './odds';
  * High-Impact, Compact, Bold 2D Canvas Slip for "LA FIJA".
  * Optimized for mobile screens, high legibility and instant rendering.
  */
+/** Carga el logo para dibujarlo en el canvas; null si falla (offline sin cache). */
+function loadLogo(): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = '/icons/logo.png';
+  });
+}
+
 export async function generateSlipBlob(
   bet: Bet,
   oddsFormat: OddsFormat,
@@ -14,6 +24,8 @@ export async function generateSlipBlob(
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas context not available');
+
+  const logo = await loadLogo();
 
   const width = 560;
   const conditions = bet.conditions;
@@ -42,15 +54,18 @@ export async function generateSlipBlob(
   ctx.strokeRect(2, 2, width - 4, height - 4);
 
   // 2. Top Header Brand Row
-  // Orange LF Badge
-  ctx.fillStyle = '#FF5500';
-  drawRoundedRect(ctx, 24, 22, 34, 34, 8);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 16px system-ui, -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('LF', 41, 45);
+  // Logo (con fallback al badge LF si la imagen no está disponible)
+  if (logo) {
+    ctx.drawImage(logo, 22, 20, 38, 38);
+  } else {
+    ctx.fillStyle = '#FF5500';
+    drawRoundedRect(ctx, 24, 22, 34, 34, 8);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 16px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('LF', 41, 45);
+  }
 
   // Brand Name: LA FIJA
   ctx.textAlign = 'left';
@@ -144,7 +159,7 @@ export async function generateSlipBlob(
     ctx.textAlign = 'left';
     ctx.fillStyle = isMet ? '#10B981' : '#64748B';
     ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
-    ctx.fillText(isMet ? '✔' : '○', 48, rowY + 24);
+    ctx.fillText(isMet ? '✓' : '○', 48, rowY + 24);
 
     // Selection Text
     ctx.fillStyle = isMet ? '#ECFDF5' : '#F1F5F9';
@@ -216,7 +231,7 @@ export async function generateSlipBlob(
   ctx.textAlign = 'left';
   ctx.fillStyle = '#64748B';
   ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-  ctx.fillText('🛡️ VERIFICADO POR LA FIJA PRO', 24, footY);
+  ctx.fillText('VERIFICADO POR LA FIJA', 24, footY);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#FF5500';

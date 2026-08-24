@@ -312,9 +312,9 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             >
               <option value='bet_builder'>
-                🔥 Bet Builder (Mismo partido)
+                Bet Builder (mismo partido)
               </option>
-              <option value='parlay'>⚡ Parlay / Combinada</option>
+              <option value='parlay'>Parlay / Combinada</option>
               <option value='single'>Simple (1 selección)</option>
             </select>
           </div>

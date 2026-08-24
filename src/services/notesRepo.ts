@@ -14,8 +14,7 @@ export async function fetchRemoteNotes(userId: string): Promise<Note[]> {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Error al descargar notas:', error.message);
-    return [];
+    throw new Error(`Error al descargar notas: ${error.message}`);
   }
   return (data ?? []).map((row: { data: Note }) => row.data);
 }
@@ -42,8 +41,7 @@ export async function syncNotesToCloud(
     .from('notes')
     .upsert(rows, { onConflict: 'id' });
   if (upsertError) {
-    console.error('Error al sincronizar notas:', upsertError.message);
-    return;
+    throw new Error(`Error al sincronizar notas: ${upsertError.message}`);
   }
 
   // Remove rows deleted locally
@@ -51,7 +49,10 @@ export async function syncNotesToCloud(
     .from('notes')
     .select('id')
     .eq('user_id', userId);
-  if (idsError || !remoteIds) return;
+  if (idsError) {
+    throw new Error(`Error al listar notas remotas: ${idsError.message}`);
+  }
+  if (!remoteIds) return;
 
   const localIds = new Set(notes.map((n) => n.id));
   const staleIds = remoteIds
@@ -65,7 +66,7 @@ export async function syncNotesToCloud(
       .in('id', staleIds)
       .eq('user_id', userId);
     if (deleteError) {
-      console.error('Error al eliminar notas remotas:', deleteError.message);
+      throw new Error(`Error al eliminar notas remotas: ${deleteError.message}`);
     }
   }
 }

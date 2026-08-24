@@ -4,8 +4,7 @@ import { TrendingUp, Flame } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import type { SportType } from '../types/bet';
 import { sportAnalyticsLabel } from '../data/sports';
-
-const ELO_STEP = 200;
+import { ELO_BASE, ELO_STEP } from '../utils/stats';
 
 interface AnalyticsModalProps {
   isOpen: boolean;
@@ -51,7 +50,8 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
       }));
   }, [bets]);
 
-  const pointsToNextRank = ELO_STEP - (stats.eloRating % ELO_STEP);
+  const pointsToNextRank =
+    ELO_STEP - ((stats.eloRating - ELO_BASE) % ELO_STEP);
 
   return (
     <Modal
@@ -82,16 +82,9 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
             </span>
           </div>
           <div>
-            <div className='flex items-center gap-2'>
-              <span className='text-sm font-bold text-white uppercase tracking-wider font-mono'>
-                RANGO: NIVEL {stats.rankLevel} PRO TIPSTER
-              </span>
-              {stats.winRate >= 60 && stats.roi >= 10 && (
-                <span className='px-1.5 py-0.5 bg-emerald-950/80 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono rounded'>
-                  TOP 5%
-                </span>
-              )}
-            </div>
+            <span className='text-sm font-bold text-white uppercase tracking-wider font-mono'>
+              RANGO: NIVEL {stats.rankLevel} PRO TIPSTER
+            </span>
             <p className='text-xs text-slate-400 font-mono-numbers'>
               Rating actual:{' '}
               <strong className='text-brand'>{stats.eloRating} ELO</strong> |

@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { useBets } from '../context/BetContext';
 import { formatConditionValue } from '../types/bet';
-import { Zap, Target, Bell, Flame } from 'lucide-react';
+import { Zap, Target, Bell, Flame, Shield } from 'lucide-react';
+import { ADS_ENABLED } from '../config/ads';
+import { AdCard } from './ads/AdCard';
 
 export const LiveFeedSidebar: React.FC = () => {
   const { liveLogs, isSimulating, bets } = useBets();
@@ -16,27 +18,31 @@ export const LiveFeedSidebar: React.FC = () => {
 
   return (
     <div className='space-y-4'>
-      {/* Live Event Stream Card */}
-      <div className='panel-card p-4 rounded'>
-        <div className='flex items-center justify-between border-b border-white/10 pb-3 mb-3'>
+      {/* Stream de eventos en vivo */}
+      <div className='panel-card rounded-lg p-4'>
+        <div className='mb-3 flex items-center justify-between border-b border-white/10 pb-3'>
           <div className='flex items-center gap-2'>
-            <span className='flex h-2.5 w-2.5 relative'>
-              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75'></span>
-              <span className='relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500'></span>
-            </span>
-            <h3 className='text-xs font-bold uppercase tracking-wider text-white font-mono'>
-              Live Match Ticker
+            {isSimulating ? (
+              <span className='relative flex h-2 w-2'>
+                <span className='absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75' />
+                <span className='relative inline-flex h-2 w-2 rounded-full bg-red-500' />
+              </span>
+            ) : (
+              <span className='h-2 w-2 rounded-full bg-slate-600' />
+            )}
+            <h3 className='text-xs font-semibold tracking-wider text-white uppercase'>
+              Eventos en vivo
             </h3>
           </div>
-          <span className='text-[10px] font-mono text-slate-400'>
-            {isSimulating ? 'TRANSMITIENDO ⚡' : 'STANDBY'}
+          <span className='font-mono-numbers text-[10px] tracking-wide text-slate-400 uppercase'>
+            {isSimulating ? 'Transmitiendo' : 'En espera'}
           </span>
         </div>
 
-        {/* Event Logs List */}
-        <div className='space-y-2.5 max-h-96 overflow-y-auto pr-1'>
+        {/* Lista de eventos */}
+        <div className='max-h-96 space-y-2 overflow-y-auto pr-1'>
           {liveLogs.length === 0 ? (
-            <p className='text-xs text-slate-500 text-center py-6'>
+            <p className='py-6 text-center text-xs text-slate-500'>
               Sin eventos. Activa el simulador o el modo de datos reales.
             </p>
           ) : (
@@ -47,27 +53,29 @@ export const LiveFeedSidebar: React.FC = () => {
               return (
                 <div
                   key={log.id}
-                  className={`p-2.5 rounded text-xs border transition-all ${
+                  className={`rounded-md border p-2.5 text-xs transition-colors ${
                     isHit
-                      ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                      ? 'border-emerald-500/25 bg-emerald-500/5 text-emerald-300'
                       : isClutch
-                        ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                        : 'bg-base border-white/5 text-slate-300'
+                        ? 'border-amber-500/30 bg-amber-500/5 text-amber-300'
+                        : 'border-white/5 text-slate-300'
                   }`}
                 >
-                  <div className='flex items-center justify-between text-[10px] font-mono mb-1'>
-                    <span className='text-orange-400 font-bold'>
+                  <div className='font-mono-numbers mb-1 flex items-center justify-between text-[10px]'>
+                    <span className='truncate font-semibold text-orange-400'>
                       {log.matchTitle}
                     </span>
-                    <span className='text-slate-400'>{log.time}</span>
+                    <span className='ml-2 shrink-0 text-slate-500'>
+                      {log.time}
+                    </span>
                   </div>
-                  <p className='leading-snug flex items-start gap-1.5'>
+                  <p className='flex items-start gap-1.5 leading-snug'>
                     {isHit ? (
-                      <Target className='w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5' />
+                      <Target className='mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400' />
                     ) : isClutch ? (
-                      <Flame className='w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5' />
+                      <Flame className='mt-0.5 h-3.5 w-3.5 shrink-0 fill-current text-amber-400' />
                     ) : (
-                      <Zap className='w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5' />
+                      <Zap className='mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400' />
                     )}
                     <span>{log.text}</span>
                   </p>
@@ -78,16 +86,16 @@ export const LiveFeedSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Summary of Live Conditions in Play */}
+      {/* Condiciones pendientes */}
       {liveBets.length > 0 && (
-        <div className='panel-card p-4 rounded'>
-          <div className='flex items-center justify-between border-b border-white/10 pb-2 mb-3'>
-            <h4 className='text-xs font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center gap-1.5'>
-              <Bell className='w-3.5 h-3.5 text-orange-400' />
-              Condiciones Pendientes
+        <div className='panel-card rounded-lg p-4'>
+          <div className='mb-3 flex items-center justify-between border-b border-white/10 pb-2.5'>
+            <h4 className='flex items-center gap-1.5 text-xs font-semibold tracking-wider text-slate-300 uppercase'>
+              <Bell className='h-3.5 w-3.5 text-brand' />
+              Condiciones pendientes
             </h4>
-            <span className='text-[10px] font-mono text-orange-400 font-bold'>
-              {pendingConditions.length} RESTANTES
+            <span className='font-mono-numbers text-[10px] font-bold text-orange-400'>
+              {pendingConditions.length}
             </span>
           </div>
 
@@ -95,17 +103,17 @@ export const LiveFeedSidebar: React.FC = () => {
             {pendingConditions.map((cond) => (
               <div
                 key={cond.id}
-                className='p-2 bg-base rounded border border-white/5 text-xs'
+                className='rounded-md border border-white/5 p-2 text-xs'
               >
-                <div className='flex justify-between items-center text-slate-300 font-medium'>
-                  <span className='truncate max-w-45'>{cond.selection}</span>
-                  <span className='text-orange-400 font-mono-numbers font-bold text-[11px]'>
+                <div className='flex items-center justify-between gap-2 font-medium text-slate-300'>
+                  <span className='truncate'>{cond.selection}</span>
+                  <span className='font-mono-numbers shrink-0 text-[11px] font-bold text-orange-400'>
                     {formatConditionValue(cond)}
                   </span>
                 </div>
-                <div className='w-full bg-panel h-1 rounded-full overflow-hidden mt-1.5'>
+                <div className='mt-1.5 h-1 overflow-hidden rounded-full bg-black/40'>
                   <div
-                    className='bg-brand h-full rounded-full'
+                    className='h-full rounded-full bg-brand transition-all duration-300'
                     style={{ width: `${cond.progress}%` }}
                   />
                 </div>
@@ -115,16 +123,21 @@ export const LiveFeedSidebar: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Pro Tips / Anti-Tilt Box */}
-      <div className='p-3.5 rounded bg-linear-to-br from-surface to-[#181B26] border border-orange-500/20'>
-        <div className='flex items-center gap-2 text-xs font-bold text-orange-400 uppercase font-mono mb-1'>
-          <span>🛡️ Bankroll Guard</span>
+      {/* Consejo de bankroll */}
+      <div className='rounded-lg border border-orange-500/20 bg-surface p-4'>
+        <div className='mb-1 flex items-center gap-2 text-xs font-semibold tracking-wide text-orange-400 uppercase'>
+          <Shield className='h-3.5 w-3.5' />
+          <span>Protección de bankroll</span>
         </div>
-        <p className='text-[11px] text-slate-400 leading-relaxed'>
-          Consejo Pro: No arriesgues más del <strong>3% al 5%</strong> de tu
-          bankroll por apuesta simple para mantener un crecimiento sostenido.
+        <p className='text-xs leading-relaxed text-slate-400'>
+          No arriesgues más del <strong className='text-slate-200'>3% al 5%</strong>{' '}
+          de tu bankroll por apuesta simple para mantener un crecimiento
+          sostenido.
         </p>
       </div>
+
+      {/* Publicidad (afiliado) — invisible hasta activar ADS_ENABLED */}
+      {ADS_ENABLED && <AdCard variant='compact' />}
     </div>
   );
 };

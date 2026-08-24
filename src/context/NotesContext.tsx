@@ -69,16 +69,20 @@ export const NotesProvider: React.FC<{ children: ReactNode }> = ({
   useEffect(() => {
     if (!cloudUserId) return;
     let cancelled = false;
-    fetchRemoteNotes(cloudUserId).then((remoteNotes) => {
-      if (cancelled) return;
-      if (remoteNotes.length > 0) {
-        setNotes(remoteNotes);
-      } else {
-        // First login: seed the cloud account with local data.
-        syncNotesToCloud(cloudUserId, notesRef.current).catch(() => {});
-      }
-      setSyncedUserId(cloudUserId);
-    });
+    fetchRemoteNotes(cloudUserId)
+      .then((remoteNotes) => {
+        if (cancelled) return;
+        if (remoteNotes.length > 0) {
+          setNotes(remoteNotes);
+        } else {
+          // First login: seed the cloud account with local data.
+          syncNotesToCloud(cloudUserId, notesRef.current).catch(() => {});
+        }
+        setSyncedUserId(cloudUserId);
+      })
+      .catch(() => {
+        if (!cancelled) setSyncedUserId(cloudUserId);
+      });
     return () => {
       cancelled = true;
     };

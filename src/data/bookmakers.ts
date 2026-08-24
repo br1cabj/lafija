@@ -80,7 +80,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     name: 'Stake (Crypto / Global)',
     shortName: 'Stake',
     region: 'CRYPTO',
-    badgeLabel: '⚡ Stake',
+    badgeLabel: 'Stake',
     color: '#1475E1',
   },
   {
@@ -88,7 +88,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     name: 'Pinnacle',
     shortName: 'Pinnacle',
     region: 'GLOBAL',
-    badgeLabel: '🎯 Pinnacle',
+    badgeLabel: 'Pinnacle',
     color: '#EE5A24',
   },
   {
@@ -96,7 +96,7 @@ export const POPULAR_BOOKMAKERS: BookmakerInfo[] = [
     name: 'Betfair',
     shortName: 'Betfair',
     region: 'GLOBAL',
-    badgeLabel: '🟡 Betfair',
+    badgeLabel: 'Betfair',
     color: '#FFB900',
   },
   {

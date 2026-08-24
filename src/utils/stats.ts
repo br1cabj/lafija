@@ -1,6 +1,13 @@
 import type { Bet, UserStats } from '../types/bet';
 
-/** Calcula todas las estadísticas derivadas de las apuestas. Función pura. */
+/** Rating base: usuario nuevo sin apuestas resueltas empieza aquí (Nivel 1). */
+export const ELO_BASE = 1000;
+/** Puntos de rating por nivel. */
+export const ELO_STEP = 200;
+
+/**
+ * Calcula todas las estadísticas derivadas de las apuestas. Función pura.
+ */
 export function computeUserStats(
   bets: Bet[],
   initialBankroll: number,
@@ -33,9 +40,31 @@ export function computeUserStats(
     b.conditions.some((c) => c.status === 'CLUTCH_DANGER'),
   ).length;
 
-  // Rating estilo ELO derivado del win rate y el beneficio neto
-  const elo = Math.round(1500 + winRate * 5 + netProfit * 0.4);
-  const level = Math.min(10, Math.max(1, Math.floor(elo / 200)));
+  // Rating estilo ELO anclado a la base: sin actividad = Nivel 1.
+  // Cada ELO_STEP puntos por encima de la base sube un nivel.
+  const elo = Math.round(ELO_BASE + winRate * 5 + netProfit * 0.4);
+  const level = Math.min(
+    10,
+    Math.max(1, Math.floor((elo - ELO_BASE) / ELO_STEP) + 1),
+  );
+
+  // Racha real actual: apuestas resueltas ordenadas por fecha de creación
+  // (aproximación: no se registra la fecha de liquidación).
+  // GANADA suma, PERDIDA corta; retiradas y anuladas no afectan.
+  const settledByDate = [...bets]
+    .filter((b) => b.status === 'WON' || b.status === 'LOST')
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  let winStreak = 0;
+  for (const bet of settledByDate) {
+    if (bet.status === 'WON') {
+      winStreak += 1;
+    } else {
+      break;
+    }
+  }
 
   return {
     bankroll: Number((initialBankroll + netProfit).toFixed(2)),
@@ -51,7 +80,7 @@ export function computeUserStats(
     ).length,
     liveBets: liveBets.length,
     clutchBets,
-    winStreak: wonBets.length > 0 ? Math.min(wonBets.length, 5) : 0,
+    winStreak,
     rankLevel: level,
     eloRating: elo,
   };

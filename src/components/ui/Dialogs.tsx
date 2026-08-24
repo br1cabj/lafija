@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal } from './Modal';
+import { Button } from './Button';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -35,34 +36,25 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <AlertTriangle className='w-5 h-5' />
       </div>
       <div className='min-w-0'>
-        <h2 className='text-sm font-bold text-white uppercase tracking-wider font-mono'>
-          {title}
-        </h2>
-        <p className='text-xs text-slate-400 mt-1'>{message}</p>
+        <h2 className='text-sm font-semibold text-white'>{title}</h2>
+        <p className='mt-1 text-xs text-slate-400'>{message}</p>
       </div>
     </div>
 
-    <div className='flex justify-end gap-2 mt-5 pt-4 border-t border-white/10'>
-      <button
-        onClick={onClose}
-        className='px-4 py-1.5 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white transition-colors'
-      >
+    <div className='mt-5 flex justify-end gap-2 border-t border-white/10 pt-4'>
+      <Button variant='ghost' onClick={onClose}>
         {cancelLabel}
-      </button>
-      <button
+      </Button>
+      <Button
+        variant={destructive ? 'danger' : 'primary'}
+        autoFocus
         onClick={() => {
           onConfirm();
           onClose();
         }}
-        autoFocus
-        className={`px-4 py-1.5 rounded text-xs font-bold uppercase text-white shadow active:scale-95 transition-all ${
-          destructive
-            ? 'bg-red-600 hover:bg-red-500'
-            : 'bg-brand hover:bg-brand-hover'
-        }`}
       >
         {confirmLabel}
-      </button>
+      </Button>
     </div>
   </Modal>
 );
@@ -109,11 +101,9 @@ const NumberInputForm: React.FC<{
 
   return (
     <>
-      <h2 className='text-sm font-bold text-white uppercase tracking-wider font-mono mb-4'>
-        {title}
-      </h2>
+      <h2 className='mb-4 text-sm font-semibold text-white'>{title}</h2>
       <form onSubmit={handleSubmit}>
-        <label className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'>
+        <label className='mb-1 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
           {label}
         </label>
         <input
@@ -129,26 +119,19 @@ const NumberInputForm: React.FC<{
             setError(null);
           }}
           aria-invalid={Boolean(error)}
-          className={`w-full bg-base border rounded px-3 py-2 text-sm text-white font-mono-numbers font-bold focus:outline-none ${
+          className={`font-mono-numbers w-full rounded-md border bg-base px-3 py-2 text-sm font-bold text-white transition-colors focus:outline-none ${
             error ? 'border-red-500/60' : 'border-white/10 focus:border-brand'
           }`}
         />
         {error && <p className='mt-1.5 text-[11px] text-red-400'>{error}</p>}
 
-        <div className='flex justify-end gap-2 mt-5 pt-4 border-t border-white/10'>
-          <button
-            type='button'
-            onClick={onClose}
-            className='px-4 py-1.5 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white transition-colors'
-          >
+        <div className='mt-5 flex justify-end gap-2 border-t border-white/10 pt-4'>
+          <Button variant='ghost' type='button' onClick={onClose}>
             Cancelar
-          </button>
-          <button
-            type='submit'
-            className='px-4 py-1.5 rounded bg-brand hover:bg-brand-hover text-white text-xs font-bold uppercase shadow active:scale-95 transition-all'
-          >
+          </Button>
+          <Button variant='primary' type='submit'>
             {submitLabel}
-          </button>
+          </Button>
         </div>
       </form>
     </>

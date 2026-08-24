@@ -15,8 +15,7 @@ export async function fetchRemoteBets(userId: string): Promise<Bet[]> {
     .eq('user_id', userId);
 
   if (error) {
-    console.error('Error al descargar apuestas:', error.message);
-    return [];
+    throw new Error(`Error al descargar apuestas: ${error.message}`);
   }
   return (data ?? []).map((row: { data: Bet }) => row.data);
 }
@@ -43,8 +42,7 @@ export async function syncBetsToCloud(
     .from('bets')
     .upsert(rows, { onConflict: 'id' });
   if (upsertError) {
-    console.error('Error al sincronizar apuestas:', upsertError.message);
-    return;
+    throw new Error(`Error al sincronizar apuestas: ${upsertError.message}`);
   }
 
   // Remove rows deleted locally
@@ -52,7 +50,10 @@ export async function syncBetsToCloud(
     .from('bets')
     .select('id')
     .eq('user_id', userId);
-  if (idsError || !remoteIds) return;
+  if (idsError) {
+    throw new Error(`Error al listar apuestas remotas: ${idsError.message}`);
+  }
+  if (!remoteIds) return;
 
   const localIds = new Set(bets.map((b) => b.id));
   const staleIds = remoteIds
@@ -66,7 +67,7 @@ export async function syncBetsToCloud(
       .in('id', staleIds)
       .eq('user_id', userId);
     if (deleteError) {
-      console.error('Error al eliminar apuestas remotas:', deleteError.message);
+      throw new Error(`Error al eliminar apuestas remotas: ${deleteError.message}`);
     }
   }
 }

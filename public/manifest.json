@@ -2,7 +2,7 @@
   "id": "/",
   "name": "LA FIJA - Tracker de Apuestas en Vivo",
   "short_name": "LA FIJA",
-  "description": "Tracker en tiempo real",
+  "description": "Seguimiento de apuestas en vivo: condiciones, progreso y estadísticas de tu bankroll",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B0C10",
@@ -30,9 +30,9 @@
       "purpose": "maskable"
     },
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

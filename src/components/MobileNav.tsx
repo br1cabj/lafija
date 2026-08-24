@@ -30,7 +30,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   return (
     <nav
       aria-label='Navegación móvil'
-      className='md:hidden fixed bottom-0 left-0 right-0 z-40 bg-base/95 backdrop-blur-lg border-t border-white/10 px-2 py-2 flex items-center justify-around'
+      style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
+      className='fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-base/95 px-2 pt-2 backdrop-blur-lg md:hidden flex items-center justify-around'
     >
       {/* Tab 1: Dashboard / Todas */}
       <button
@@ -42,7 +43,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         aria-current={
           view === 'dashboard' && filter === 'ALL' ? 'page' : undefined
         }
-        className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
+        className={`flex flex-col items-center gap-1 text-[11px] font-semibold transition-colors ${
           view === 'dashboard' && filter === 'ALL'
             ? 'text-brand'
             : 'text-slate-400'
@@ -62,7 +63,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         aria-current={
           view === 'dashboard' && filter === 'LIVE' ? 'page' : undefined
         }
-        className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold relative transition-colors ${
+        className={`flex flex-col items-center gap-1 text-[11px] font-semibold relative transition-colors ${
           view === 'dashboard' && filter === 'LIVE'
             ? 'text-brand'
             : 'text-slate-400'
@@ -95,7 +96,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         onClick={() => onChangeView('notes')}
         aria-label='Abrir diario de notas'
         aria-current={view === 'notes' ? 'page' : undefined}
-        className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
+        className={`flex flex-col items-center gap-1 text-[11px] font-semibold transition-colors ${
           view === 'notes' ? 'text-brand' : 'text-slate-400'
         }`}
       >
@@ -107,7 +108,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       <button
         onClick={onOpenAnalyticsModal}
         aria-label='Ver métricas'
-        className='flex flex-col items-center gap-1 text-[10px] font-mono font-semibold text-slate-400 hover:text-white transition-colors'
+        className='flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-white transition-colors'
       >
         <TrendingUp className='w-5 h-5' />
         <span>Métricas</span>
@@ -118,7 +119,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
         onClick={toggleSimulation}
         aria-label={isSimulating ? 'Desactivar simulador' : 'Activar simulador'}
         aria-pressed={isSimulating}
-        className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
+        className={`flex flex-col items-center gap-1 text-[11px] font-semibold transition-colors ${
           isSimulating ? 'text-emerald-400' : 'text-slate-400'
         }`}
       >

@@ -1,13 +1,18 @@
 /* LA FIJA service worker - offline-first shell cache */
-const CACHE_NAME = 'lafija-v1';
-const PRECACHE_URLS = ['/', '/index.html', '/manifest.json', '/favicon.svg'];
+const CACHE_NAME = 'lafija-v2';
+const PRECACHE_URLS = ['/', '/index.html', '/manifest.json', '/favicon.png'];
+
+// El SW nuevo queda en espera hasta que el usuario acepte recargar
+// (SKIP_WAITING enviado por PWAUpdateToast) o cierre todas las pestañas.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting()),
+      .then((cache) => cache.addAll(PRECACHE_URLS)),
   );
 });
 
@@ -37,8 +42,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+          // Solo cachea respuestas válidas: evita envenenar el shell
+          // offline con una página de error (ej. 500 del server).
+          if (response.ok && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', copy));
+          }
           return response;
         })
         .catch(() =>
