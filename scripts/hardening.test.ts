@@ -6,6 +6,7 @@
 import { effectiveOdds } from '../src/types/bet';
 import type { Bet, BetCondition } from '../src/types/bet';
 import {
+  applyLiveUpdate,
   findFixtureForBet,
   namesMatch,
   needsStats,
@@ -15,6 +16,8 @@ import {
 import type { LiveFixture } from '../src/services/sportsApi';
 import { sanitizeBets, sanitizeNotes } from '../src/utils/sanitize';
 import { computeUserStats } from '../src/utils/stats';
+import { applyConditionDelta, computeCashout } from '../src/utils/simulation';
+import { formatOdds, parseInputToDecimal } from '../src/utils/odds';
 
 // ---- Mini framework ---------------------------------------------------------
 
@@ -345,7 +348,183 @@ test('stats completos en cero SON válidos (0-0 córners reales)', () => {
   assert(v === 0, `cero real debe respetarse, dio ${String(v)}`);
 });
 
-// ---- Resumen -----------------------------------------------------------------
+// ---- 6. applyLiveUpdate (auto-tracking) --------------------------------------
+
+console.log('\n[6] applyLiveUpdate');
+
+test('apuesta no LIVE queda intacta', () => {
+  const b = bet({ status: 'PENDING' });
+  const r = applyLiveUpdate(b, fixture({ homeScore: 5, awayScore: 4 }), null);
+  assert(r.bet === b, 'no debe tocar la apuesta');
+  assert(r.newHits.length === 0, 'sin hits');
+});
+
+test('condición de goles se marca con el marcador', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'g', market: 'Goles Totales', selection: 'Más de 2.5 goles', targetValue: 3, currentValue: 1 }),
+    ],
+  });
+  const r = applyLiveUpdate(b, fixture({ homeScore: 2, awayScore: 1 }), null);
+  assert(r.bet.conditions[0].status === 'MET', 'debe pasar a MET');
+  assert(r.bet.conditions[0].currentValue === 3, 'currentValue = total goles');
+  assert(r.newHits.includes('Más de 2.5 goles'), 'debe registrar hit');
+});
+
+test('stats null: condición de córners NO avanza ni se inventa cero', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'c', market: 'Córners', selection: 'Más de 8.5 córners', targetValue: 9, currentValue: 4 }),
+    ],
+  });
+  const r = applyLiveUpdate(b, fixture(), null);
+  assert(r.bet.conditions[0].currentValue === 4, 'valor congelado');
+  assert(r.newHits.length === 0, 'sin hits');
+});
+
+test('condiciones VOID quedan congeladas aunque haya datos', () => {
+  const before = cond({ id: 'v', market: 'Córners', selection: 'X', targetValue: 5, currentValue: 1, status: 'VOID' });
+  const b = bet({ status: 'LIVE', conditions: [before] });
+  const full: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: '', awayTeam: '',
+    corners: { home: 6, away: 3, total: 9 },
+  };
+  const r = applyLiveUpdate(b, fixture(), full);
+  assert(r.bet.conditions[0].currentValue === 1, 'VOID no cambia');
+  assert(r.newHits.length === 0, 'sin hits en VOID');
+});
+
+test('regresión del valor real no rebaja el progreso ya logrado', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'g', market: 'Goles Totales', selection: 'Más de 1.5', targetValue: 2, currentValue: 2, status: 'MET', isLock: true }),
+    ],
+  });
+  // El feed retrocede el marcador a 0-0 (glitch de proveedor)
+  const r = applyLiveUpdate(b, fixture({ homeScore: 0, awayScore: 0 }), null);
+  assert(r.bet.conditions[0].currentValue === 2, 'no debe rebajar');
+});
+
+test('POSTPONED del feed llega al matchInfo', () => {
+  const b = bet({ status: 'LIVE' });
+  const r = applyLiveUpdate(b, fixture({ statusShort: 'POSTPONED' }), null);
+  assert(r.bet.match.status === 'POSTPONED', `esperaba POSTPONED, dio ${r.bet.match.status}`);
+});
+
+// ---- 7. cashout y deltas manuales ---------------------------------------------
+
+console.log('\n[7] simulación y cashout');
+
+test('cashout sin condiciones = stake', () => {
+  const b = bet({ stake: 100, odds: 3 });
+  assert(computeCashout(b, []) === 100, 'debe devolver el stake');
+});
+
+test('cashout con todo MET crece hacia la cuota', () => {
+  const b = bet({ stake: 100, odds: 3 });
+  const cs = computeCashout(b, [
+    cond({ id: 'a', status: 'MET' }),
+    cond({ id: 'b', status: 'MET' }),
+  ]);
+  assert(cs > 100 && cs <= 300, `cashout fuera de rango: ${cs}`);
+});
+
+test('delta alcanza objetivo -> apuesta pasa a WON', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [cond({ id: 'x', targetValue: 2, currentValue: 1 })],
+  });
+  const r = applyConditionDelta(b, 'x', 1);
+  assert(r.status === 'WON', `esperaba WON, dio ${r.status}`);
+  assert(r.conditions[0].isLock === true, 'bloqueada al cumplirse');
+});
+
+test('delta negativo no baja de cero y des-asienta WON', () => {
+  const b = bet({
+    status: 'WON',
+    conditions: [cond({ id: 'x', targetValue: 1, currentValue: 1, status: 'MET' })],
+  });
+  const r = applyConditionDelta(b, 'x', -5);
+  assert(r.conditions[0].currentValue === 0, 'clamp a cero');
+  assert(r.status === 'LIVE', `WON debe revertir a LIVE, dio ${r.status}`);
+});
+
+test('condición inexistente o textual no explota', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [cond({ id: 't', market: 'Resultado', selection: 'Local', targetValue: '1X', currentValue: '1X' })],
+  });
+  const r = applyConditionDelta(b, 'no-existe', 1);
+  assert(r.conditions.length === 1, 'intacta');
+  const r2 = applyConditionDelta(b, 't', 1);
+  assert(r2.conditions[0].currentValue === '1X', 'textual sin cambios');
+});
+
+// ---- 8. formato de cuotas hostil ----------------------------------------------
+
+console.log('\n[8] formato de cuotas');
+
+test('formatos nunca devuelven NaN/Infinity como texto', () => {
+  for (const odd of [Number.NaN, Infinity, -Infinity, -5, 0, 1e300]) {
+    for (const fmt of ['decimal', 'american', 'fractional', 'implied'] as const) {
+      const s = formatOdds(odd, fmt);
+      assert(!/nan|infinity/i.test(s), `formatOdds(${odd}, ${fmt}) -> "${s}"`);
+      assert(typeof s === 'string' && s.length > 0, `salida vacía para ${odd}/${fmt}`);
+    }
+  }
+});
+
+test('parseo rechaza basura en todos los formatos', () => {
+  for (const bad of ['abc', '', '  ', '-3', '<script>', '2;drop table']) {
+    for (const fmt of ['decimal', 'american', 'fractional', 'implied'] as const) {
+      const v = parseInputToDecimal(bad, fmt);
+      assert(v === null || (Number.isFinite(v) && v >= 1), `"${bad}" (${fmt}) -> ${v}`);
+    }
+  }
+});
+
+test('parseo acepta variantes legítimas', () => {
+  assert(parseInputToDecimal('2,50', 'decimal') === 2.5, 'coma decimal');
+  assert(parseInputToDecimal('+150', 'american') === 2.5, 'americana positiva');
+  assert(parseInputToDecimal('-200', 'american') === 1.5, 'americana negativa');
+  assert(parseInputToDecimal('3/2', 'fractional') === 2.5, 'fraccional');
+  assert(parseInputToDecimal('40%', 'implied') === 2.5, 'implícita');
+});
+
+// ---- 9. prototype pollution y caps ---------------------------------------------
+
+console.log('\n[9] ataques de objeto');
+
+test('__proto__ en JSON no contamina Object.prototype', () => {
+  const evil = JSON.parse(
+    '{"__proto__":{"polluted":true},"id":"x","conditions":[]}',
+  ) as unknown;
+  sanitizeBets(evil);
+  assert(({} as Record<string, unknown>).polluted === undefined, 'Object.prototype contaminado!');
+});
+
+test('constructor/toString como claves no rompen', () => {
+  const out = sanitizeBets([
+    { id: 'constructor', constructor: { prototype: { x: 1 } }, conditions: [] },
+    { id: 'hasOwnProperty', __proto__: null },
+  ]);
+  assert(out.every((b) => typeof b.id === 'string'), 'ids sobreviven como strings');
+});
+
+test('montos absurdos quedan dentro de límites finitos', () => {
+  const [b] = sanitizeBets([
+    { id: 'x', stake: 1e15, odds: 1e10, potentialPayout: 1e20, cashoutValue: -50, conditions: [], match: {} },
+  ]);
+  assert(Number.isFinite(b.stake) && b.stake <= 1e9, `stake sin cap: ${b.stake}`);
+  assert(Number.isFinite(b.odds) && b.odds <= 1e6, `odds sin cap: ${b.odds}`);
+  assert(Number.isFinite(b.potentialPayout) && b.potentialPayout <= 1e12, 'payout sin cap');
+  assert(b.cashoutValue === null, 'cashout negativo -> null');
+});
+
+// ---- Resumo -----------------------------------------------------------------
 
 console.log(`\n${passed} tests OK, ${failures.length} fallos`);
 if (failures.length > 0) {

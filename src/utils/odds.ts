@@ -14,7 +14,8 @@ function gcd(a: number, b: number): number {
 }
 
 export function decimalToFractional(decimal: number): string {
-  if (decimal <= 1) return '0/1';
+  // Infinity pasaria como numerador infinito -> "NaN/NaN"
+  if (!Number.isFinite(decimal) || decimal <= 1) return '0/1';
   const net = decimal - 1;
 
   // Common standard fractions map for betting accuracy
@@ -71,7 +72,7 @@ export function decimalToFractional(decimal: number): string {
 }
 
 export function decimalToAmerican(decimal: number): string {
-  if (!decimal || isNaN(decimal) || decimal <= 1.01) return '+100';
+  if (!Number.isFinite(decimal) || isNaN(decimal) || decimal <= 1.01) return '+100';
   if (decimal >= 2.0) {
     const american = Math.round((decimal - 1) * 100);
     return `+${american}`;
@@ -93,7 +94,8 @@ export function formatOdds(
   decimalOdds: number,
   format: OddsFormat = 'decimal',
 ): string {
-  if (!decimalOdds || isNaN(decimalOdds)) return '1.00';
+  // Infinity/-Infinity/NaN pasan el check clasico de isNaN: se exige finito
+  if (!Number.isFinite(decimalOdds)) return '1.00';
 
   switch (format) {
     case 'american':
@@ -104,7 +106,7 @@ export function formatOdds(
       return decimalToImpliedProbability(decimalOdds);
     case 'decimal':
     default:
-      return decimalOdds.toFixed(2);
+      return Math.max(1, decimalOdds).toFixed(2);
   }
 }
 
@@ -142,13 +144,14 @@ export function parseInputToDecimal(
       const [numStr, denStr] = cleaned.split('/');
       const num = parseFloat(numStr);
       const den = parseFloat(denStr);
-      if (!isNaN(num) && !isNaN(den) && den !== 0) {
+      if (Number.isFinite(num) && Number.isFinite(den) && num > 0 && den > 0) {
         return parseFloat((num / den + 1).toFixed(3));
       }
       return null;
     }
     const val = parseFloat(cleaned);
-    return isNaN(val) ? null : val;
+    // Sin "/" es decimal suelto: debe ser cuota valida >= 1
+    return Number.isFinite(val) && val >= 1 ? val : null;
   }
 
   if (format === 'implied') {

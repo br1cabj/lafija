@@ -150,7 +150,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     ]);
   };
 
-  const parsedStake = parseFloat(stake.replace(',', '.')) || 0;
+  // Cap anti-basura: 1e9 evita Infinity en payout y null silencioso en la nube
+  const parsedStake = Math.min(parseFloat(stake.replace(',', '.')) || 0, 1e9);
   const parsedOdds = parseInputToDecimal(oddsInput, inputOddsFormat);
   const superSubLabel = getSuperSubLabel(bookmaker || 'Betsson');
   const oddsError =

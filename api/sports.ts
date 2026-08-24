@@ -237,9 +237,16 @@ async function handleStats(
 }
 
 export default async function handler(
-  req: { query?: Record<string, string | string[] | undefined> },
+  req: { method?: string; query?: Record<string, string | string[] | undefined> },
   res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
 ): Promise<void> {
+  // Solo GET/HEAD: otros metodos bypasses el edge cache y quemarian cuota
+  const method = (req.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    sendJson(res, 405, { error: 'Metodo no permitido' });
+    return;
+  }
+
   if (!getApiKey()) {
     sendJson(res, 503, { error: 'SPORTS_API_KEY no configurada en el servidor' });
     return;
@@ -250,10 +257,11 @@ export default async function handler(
     const fixtureParam = query.fixture;
     const teamsSearch = query.teamsSearch;
 
-    // ?teamsSearch=xxx -> autocomplete de equipos (cache 24h)
+    // ?teamsSearch=xxx -> autocomplete de equipos (cache 24h server + edge)
     if (teamsSearch !== undefined) {
       const term = (Array.isArray(teamsSearch) ? teamsSearch[0] : teamsSearch)?.trim() ?? '';
-      if (term.length < 3) {
+      // Limita longitud: terminos absurdos cuestan cuota igual que uno util
+      if (term.length < 3 || term.length > 60) {
         sendJson(res, 200, { teams: [] });
         return;
       }

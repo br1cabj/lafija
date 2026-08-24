@@ -150,7 +150,8 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
     const saved = readLocalStorage(INITIAL_BANKROLL_KEY);
     if (saved) {
       const parsed = parseFloat(saved);
-      if (!isNaN(parsed) && parsed >= 0) return parsed;
+      // Cap 1e12: Infinity/NaN pasarian el guard y romperian el JSON de sync
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1e12) return parsed;
     }
     return DEFAULT_INITIAL_BANKROLL;
   });

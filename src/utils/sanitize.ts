@@ -32,10 +32,21 @@ const CONDITION_STATUSES = [
   'VOID',
 ] as const;
 
-/** Número finito y no negativo; si no, fallback. */
-function safeNumber(v: unknown, fallback: number, min = -Infinity): number {
+/** Límites anti-basura: más allá de esto es error de tipeo o ataque. */
+const MAX_STAKE = 1e9;
+const MAX_ODDS = 1e6;
+const MAX_MONEY = 1e12;
+
+/** Número finito dentro de [min, max]; si no, fallback. */
+function safeNumber(
+  v: unknown,
+  fallback: number,
+  min = -Infinity,
+  max = Infinity,
+): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) return fallback;
-  return v < min ? fallback : v;
+  if (v < min || v > max) return fallback;
+  return v;
 }
 
 function safeString(v: unknown, fallback = ''): string {
@@ -142,13 +153,16 @@ function sanitizeBet(raw: unknown): Bet | null {
       league: safeString(m.league),
       linked: m.linked === true,
     },
-    stake: safeNumber(b.stake, 0, 0),
-    odds: Math.max(1, safeNumber(b.odds, 1, 1)),
-    potentialPayout: safeNumber(b.potentialPayout, 0, 0),
+    stake: safeNumber(b.stake, 0, 0, MAX_STAKE),
+    odds: Math.max(1, Math.min(safeNumber(b.odds, 1, 1, MAX_ODDS), MAX_ODDS)),
+    potentialPayout: safeNumber(b.potentialPayout, 0, 0, MAX_MONEY),
     bookmaker: safeString(b.bookmaker),
     status,
     cashoutValue:
-      typeof b.cashoutValue === 'number' && Number.isFinite(b.cashoutValue)
+      typeof b.cashoutValue === 'number' &&
+      Number.isFinite(b.cashoutValue) &&
+      b.cashoutValue >= 0 &&
+      b.cashoutValue <= MAX_MONEY
         ? b.cashoutValue
         : null,
     conditions,

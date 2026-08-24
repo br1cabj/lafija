@@ -568,9 +568,17 @@ function sendJson(
 }
 
 export default async function handler(
-  req: { query?: Record<string, string | string[] | undefined> },
+  req: { method?: string; query?: Record<string, string | string[] | undefined> },
   res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
 ): Promise<void> {
+  // Solo GET/HEAD: cualquier otro metodo bypasses el edge cache y quemaria
+  // cuota al invocar la cascada. Sin body que procesar, no hay excusa.
+  const method = (req.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    sendJson(res, 405, { error: 'Metodo no permitido' });
+    return;
+  }
+
   try {
     const query = req.query ?? {};
 
