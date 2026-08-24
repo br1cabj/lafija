@@ -151,7 +151,8 @@ export const LiveResults: React.FC = () => {
                       </span>
                       <span
                         className={`shrink-0 rounded-sm px-1.5 py-0.5 text-[10px] font-bold ${
-                          STATUS_STYLES[r.status] ?? 'bg-white/10 text-slate-400'
+                          STATUS_STYLES[r.status] ??
+                          'bg-white/10 text-slate-400'
                         }`}
                       >
                         {isLive ? r.minute || r.status : r.status}

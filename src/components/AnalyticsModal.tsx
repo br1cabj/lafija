@@ -50,8 +50,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
       }));
   }, [bets]);
 
-  const pointsToNextRank =
-    ELO_STEP - ((stats.eloRating - ELO_BASE) % ELO_STEP);
+  const pointsToNextRank = ELO_STEP - ((stats.eloRating - ELO_BASE) % ELO_STEP);
 
   return (
     <Modal
@@ -69,7 +68,9 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
           <h2 className='text-lg font-bold text-white uppercase tracking-wider font-mono'>
             Estadísticas & Análisis de Rendimiento
           </h2>
-          <p className='text-xs text-slate-400'>Métricas y Control de Bankroll</p>
+          <p className='text-xs text-slate-400'>
+            Métricas y Control de Bankroll
+          </p>
         </div>
       </div>
 

@@ -36,7 +36,12 @@ export const FilterBar: React.FC = () => {
   const filterTabs = [
     { id: 'ALL', label: 'Todas', count: counts.all, isLive: false },
     { id: 'LIVE', label: 'En vivo', count: counts.live, isLive: true },
-    { id: 'PENDING', label: 'Pendientes', count: counts.pending, isLive: false },
+    {
+      id: 'PENDING',
+      label: 'Pendientes',
+      count: counts.pending,
+      isLive: false,
+    },
     { id: 'WON', label: 'Ganadas', count: counts.won, isLive: false },
   ];
 

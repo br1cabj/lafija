@@ -317,9 +317,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
               onChange={(e) => setBetType(e.target.value as BetType)}
               className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
             >
-              <option value='bet_builder'>
-                Bet Builder (mismo partido)
-              </option>
+              <option value='bet_builder'>Bet Builder (mismo partido)</option>
               <option value='parlay'>Parlay / Combinada</option>
               <option value='single'>Simple (1 selección)</option>
             </select>
@@ -575,12 +573,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             <button
               type='button'
               onClick={() =>
-                addPreset(
-                  'Tarjetas Totales',
-                  '+3.5 Tarjetas',
-                  3.5,
-                  'tarjetas',
-                )
+                addPreset('Tarjetas Totales', '+3.5 Tarjetas', 3.5, 'tarjetas')
               }
               className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
             >
@@ -691,10 +684,13 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                     value={c.odds ?? ''}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      const value = raw === '' ? undefined : parseFloat(raw) || undefined;
+                      const value =
+                        raw === '' ? undefined : parseFloat(raw) || undefined;
                       setConditions((prev) =>
                         prev.map((cond, i) =>
-                          i === idx ? recalcProgress({ ...cond, odds: value }) : cond,
+                          i === idx
+                            ? recalcProgress({ ...cond, odds: value })
+                            : cond,
                         ),
                       );
                     }}
@@ -708,7 +704,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                   role='switch'
                   aria-checked={Boolean(c.superSub)}
                   aria-label='Super Sub: la línea hereda al suplente'
-                  title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}                  onClick={() => {
+                  title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
+                  onClick={() => {
                     setConditions((prev) =>
                       prev.map((cond, i) =>
                         i === idx

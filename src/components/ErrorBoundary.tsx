@@ -33,9 +33,7 @@ export class ErrorBoundary extends React.Component<
             draggable={false}
           />
           <div>
-            <h1 className='text-lg font-semibold text-white'>
-              Algo salió mal
-            </h1>
+            <h1 className='text-lg font-semibold text-white'>Algo salió mal</h1>
             <p className='mt-1 max-w-sm text-sm text-slate-400'>
               Ocurrió un error inesperado. Tus datos están guardados en este
               dispositivo.

@@ -159,13 +159,13 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
         </button>
       </div>
 
-        {/* Safari / Mobile Long-Press Callout */}
-        <div className='mb-2.5 p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-center gap-2 text-[11px] text-orange-300 font-medium'>
-          <Smartphone className='w-4 h-4 text-brand shrink-0' />
-          <span>
-            iPhone: mantén presionada la tarjeta para guardarla o compartirla.
-          </span>
-        </div>
+      {/* Safari / Mobile Long-Press Callout */}
+      <div className='mb-2.5 p-2 bg-orange-500/10 border border-orange-500/30 rounded-lg flex items-center gap-2 text-[11px] text-orange-300 font-medium'>
+        <Smartphone className='w-4 h-4 text-brand shrink-0' />
+        <span>
+          iPhone: mantén presionada la tarjeta para guardarla o compartirla.
+        </span>
+      </div>
 
       {/* Error Alert */}
       {errorMessage && (

@@ -60,6 +60,23 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Tailwind v4 quita el cursor pointer de los botones: se restaura aquí */
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  [role='checkbox']:not(:disabled),
+  [role='switch']:not(:disabled),
+  [role='tab'],
+  [role='option'],
+  label[for],
+  select,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
   /* Evita el zoom automático de iOS al enfocar campos (< 16px) */
   @media (max-width: 767px) {
     input,

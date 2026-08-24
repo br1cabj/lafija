@@ -130,9 +130,9 @@ export const LiveFeedSidebar: React.FC = () => {
           <span>Protección de bankroll</span>
         </div>
         <p className='text-xs leading-relaxed text-slate-400'>
-          No arriesgues más del <strong className='text-slate-200'>3% al 5%</strong>{' '}
-          de tu bankroll por apuesta simple para mantener un crecimiento
-          sostenido.
+          No arriesgues más del{' '}
+          <strong className='text-slate-200'>3% al 5%</strong> de tu bankroll
+          por apuesta simple para mantener un crecimiento sostenido.
         </p>
       </div>
 

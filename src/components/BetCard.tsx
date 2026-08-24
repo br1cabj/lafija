@@ -57,7 +57,9 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
   // Las condiciones anuladas no cuentan para el progreso (aportan cuota 1.0)
   const activeConditions = bet.conditions.filter((c) => c.status !== 'VOID');
   const totalConditions = activeConditions.length;
-  const metConditions = activeConditions.filter((c) => c.status === 'MET').length;
+  const metConditions = activeConditions.filter(
+    (c) => c.status === 'MET',
+  ).length;
   const pendingConditions = totalConditions - metConditions;
   const globalProgress =
     totalConditions > 0
@@ -102,8 +104,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
 
           {isMatchPoint && (
             <Badge variant='clutch'>
-              <Flame className='h-3 w-3 fill-current' />
-              A 1 del cobro
+              <Flame className='h-3 w-3 fill-current' />A 1 del cobro
             </Badge>
           )}
 
@@ -208,8 +209,8 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                       }}
                       className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                     >
-                      <Trophy className='h-3.5 w-3.5 text-emerald-400' />{' '}
-                      Marcar ganada
+                      <Trophy className='h-3.5 w-3.5 text-emerald-400' /> Marcar
+                      ganada
                     </button>
                     <button
                       onClick={() => {
@@ -382,7 +383,11 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
             return (
               <li
                 key={cond.id}
-                title={cond.supersubFrom ? `Super Sub — heredó de: ${cond.supersubFrom}` : cond.dangerNote}
+                title={
+                  cond.supersubFrom
+                    ? `Super Sub — heredó de: ${cond.supersubFrom}`
+                    : cond.dangerNote
+                }
                 className={`flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm transition-colors ${
                   isVoid
                     ? 'border-white/5 bg-black/20 opacity-60'
