@@ -4,7 +4,7 @@
  * Cachea 30s por fixture.
  */
 
-import { cachedUpstreamFetch, getApiKey, sendJsonError } from './_upstream';
+import { cachedUpstreamFetch, getApiKey, sendJsonError } from './_upstream.js';
 
 interface ApiStatItem {
   type?: string;

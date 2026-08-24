@@ -4,7 +4,7 @@
  * Cachea 45s: N usuarios comparten la misma respuesta upstream.
  */
 
-import { cachedUpstreamFetch, getApiKey, sendJsonError } from './_upstream';
+import { cachedUpstreamFetch, getApiKey, sendJsonError } from './_upstream.js';
 
 interface ApiFixture {
   fixture?: {
