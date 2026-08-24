@@ -15,6 +15,7 @@ import { MobileNav } from './components/MobileNav';
 import { LiveFeedSidebar } from './components/LiveFeedSidebar';
 import { NotesView } from './components/notes/NotesView';
 import type { Bet } from './types/bet';
+import { isSupabaseConfigured } from './services/supabase';
 import { Plus, ShieldCheck, Zap } from 'lucide-react';
 
 export type AppView = 'dashboard' | 'notes';
@@ -81,7 +82,7 @@ const DashboardContent: React.FC = () => {
       />
 
       {/* Main Container */}
-      <main className='max-w-5xl mx-auto px-4 py-4'>
+      <main className='max-w-7xl mx-auto px-4 lg:px-8 py-4'>
         {view === 'notes' ? (
           <NotesView />
         ) : (
@@ -179,17 +180,28 @@ const DashboardContent: React.FC = () => {
       <footer className='max-w-7xl mx-auto px-4 lg:px-8 mt-12 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2'>
         <div className='flex items-center gap-2'>
           <span className='font-bold text-slate-400 uppercase tracking-wider font-mono'>
-            LA FIJA v1.0
+            LA FIJA v2.0
           </span>
           <span>•</span>
           <span>Tracker de Apuestas en Vivo</span>
         </div>
         <div className='flex items-center gap-2 text-[11px] font-mono'>
-          <span className='flex items-center gap-1 text-emerald-400'>
-            <ShieldCheck className='w-3.5 h-3.5' /> PWA Ready
-          </span>
-          <span>•</span>
-          <span>WebSocket Realtime Engine</span>
+          {isSupabaseConfigured ? (
+            <>
+              <span className='flex items-center gap-1 text-emerald-400'>
+                <ShieldCheck className='w-3.5 h-3.5' /> Sync en la nube
+              </span>
+              <span>•</span>
+            </>
+          ) : (
+            <>
+              <span className='flex items-center gap-1 text-slate-400'>
+                <ShieldCheck className='w-3.5 h-3.5' /> Modo local
+              </span>
+              <span>•</span>
+            </>
+          )}
+          <span>Instalable (PWA)</span>
         </div>
       </footer>
     </div>

@@ -58,7 +58,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
 
   return (
     <div
-      className={`bg-surface rounded-lg p-3.5 sm:p-4 mb-3 transition-all relative ${
+      className={`bg-surface rounded-lg p-3.5 sm:p-4 lg:p-5 mb-3 transition-all relative ${
         isMatchPoint
           ? 'border-2 border-orange-500 shadow-lg shadow-orange-950/60 ring-1 ring-orange-500/40'
           : 'border border-white/10 hover:border-white/20'
@@ -238,7 +238,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
         aria-expanded={!isCollapsed}
         className='w-full flex items-baseline justify-between mb-2.5 cursor-pointer select-none text-left'
       >
-        <h3 className='text-base font-bold text-white tracking-tight flex items-center gap-2'>
+        <h3 className='text-base lg:text-lg font-bold text-white tracking-tight flex items-center gap-2'>
           <span>{bet.match.homeTeam}</span>
           {bet.match.homeScore !== undefined && (
             <span className='font-mono text-orange-400 font-extrabold text-xs px-1.5 py-0.5 bg-black/60 border border-orange-500/30 rounded'>
@@ -251,7 +251,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
       </button>
 
       {/* Clean Financial Strip */}
-      <div className='bg-[#08090D] px-3 py-2 rounded-lg border border-white/5 flex items-center justify-between text-xs font-mono mb-2.5'>
+      <div className='bg-[#08090D] px-3 py-2 rounded-lg border border-white/5 flex items-center justify-between text-xs lg:text-sm font-mono mb-2.5'>
         <div>
           <span className='text-slate-400 text-[10px] uppercase font-bold block'>
             Stake
@@ -292,7 +292,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
               <li
                 key={cond.id}
                 title={cond.dangerNote}
-                className={`p-2.5 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 border ${
+                className={`p-2.5 rounded-lg text-xs lg:text-sm transition-colors flex items-center justify-between gap-2 border ${
                   isMet
                     ? 'bg-emerald-950/30 border-emerald-500/30'
                     : isBusted
@@ -330,7 +330,7 @@ function BetCardComponent({ bet, onShare }: BetCardProps) {
                 {/* Progress Count & Fat-Finger Friendly Touch Controls */}
                 <div className='flex items-center gap-2 shrink-0 font-mono'>
                   <span
-                    className={`text-xs font-black ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
+                    className={`text-xs lg:text-sm font-black ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
                   >
                     {formatConditionValue(cond)}
                   </span>

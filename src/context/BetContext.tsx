@@ -87,11 +87,24 @@ function writeLocalStorage(key: string, value: string): void {
   }
 }
 
+/** Ids de las semillas demo de versiones anteriores (se descargan al cargar). */
+const LEGACY_MOCK_BET_IDS = new Set([
+  'bet-001',
+  'bet-002',
+  'bet-003',
+  'bet-004',
+  'bet-005',
+]);
+
 function loadInitialBets(): Bet[] {
   const saved = readLocalStorage(STORAGE_KEY);
   if (saved) {
     try {
-      return JSON.parse(saved) as Bet[];
+      const parsed = JSON.parse(saved) as Bet[];
+      // Purga de datos demo heredados de versiones con mocks
+      return Array.isArray(parsed)
+        ? parsed.filter((b) => !LEGACY_MOCK_BET_IDS.has(b.id))
+        : [];
     } catch {
       return [];
     }

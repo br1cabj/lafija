@@ -52,15 +52,15 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
   const [copiedImage, setCopiedImage] = useState(false);
 
   const currentKey = useMemo(
-    () =>
-      bet
-        ? makeTicketKey(bet, oddsFormat, currencySymbol)
-        : '',
+    () => (bet ? makeTicketKey(bet, oddsFormat, currencySymbol) : ''),
     [bet, oddsFormat, currencySymbol],
   );
 
   const isGenerating =
-    isOpen && Boolean(bet) && ticketState.key !== currentKey && !ticketState.error;
+    isOpen &&
+    Boolean(bet) &&
+    ticketState.key !== currentKey &&
+    !ticketState.error;
   const imageBlob = ticketState.key === currentKey ? ticketState.blob : null;
   const imageUrl = ticketState.key === currentKey ? ticketState.dataUrl : null;
   const errorMessage =
@@ -177,7 +177,7 @@ export const ShareTicketModal: React.FC<ShareTicketModalProps> = ({
       )}
 
       {/* Big Crisp Card Preview (Target for Long-Press / Native Save) */}
-      <div className='relative shadow-2xl border-2 border-orange-500/80 bg-[#0E1017] flex items-center justify-center min-h-[300px]'>
+      <div className='relative shadow-2xl border-2 border-orange-500/80 bg-[#0E1017] flex items-center justify-center min-h-75'>
         {isGenerating ? (
           <div className='text-center p-8'>
             <div className='w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-2' />

@@ -76,7 +76,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className='sticky top-0 z-40 bg-base/95 backdrop-blur-md border-b border-white/10 px-4 lg:px-8 py-3'>
-      <div className='max-w-4xl mx-auto flex items-center justify-between gap-3'>
+      <div className='max-w-7xl mx-auto flex items-center justify-between gap-3'>
         {/* Brand */}
         <div className='flex items-center gap-2.5'>
           <div className='w-8 h-8 rounded bg-brand flex items-center justify-center font-black text-white text-sm shadow-md shadow-orange-950/50'>

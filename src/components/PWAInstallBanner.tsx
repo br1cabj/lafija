@@ -61,7 +61,7 @@ export const PWAInstallBanner: React.FC = () => {
   if (isDismissed || isInstalled) return null;
 
   return (
-    <div className='bg-gradient-to-r from-orange-950/80 via-[#181B26] to-surface border-b border-orange-500/30 px-4 py-2.5'>
+    <div className='md:hidden bg-linear-to-r from-orange-950/80 via-[#181B26] to-surface border-b border-orange-500/30 px-4 py-2.5'>
       <div className='max-w-7xl mx-auto flex items-center justify-between gap-3'>
         <div className='flex items-center gap-2.5'>
           <div className='p-1.5 rounded bg-brand text-white'>

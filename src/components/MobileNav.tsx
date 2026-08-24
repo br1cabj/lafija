@@ -1,7 +1,14 @@
 import React from 'react';
 import { useBets } from '../context/BetContext';
 import type { AppView } from '../App';
-import { LayoutGrid, Radio, Plus, TrendingUp, Zap, NotebookPen } from 'lucide-react';
+import {
+  LayoutGrid,
+  Radio,
+  Plus,
+  TrendingUp,
+  Zap,
+  NotebookPen,
+} from 'lucide-react';
 
 interface MobileNavProps {
   view: AppView;
@@ -32,7 +39,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
           setFilter('ALL');
         }}
         aria-label='Ver todas las apuestas'
-        aria-current={view === 'dashboard' && filter === 'ALL' ? 'page' : undefined}
+        aria-current={
+          view === 'dashboard' && filter === 'ALL' ? 'page' : undefined
+        }
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
           view === 'dashboard' && filter === 'ALL'
             ? 'text-brand'
@@ -50,7 +59,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
           setFilter('LIVE');
         }}
         aria-label={`Apuestas en vivo (${liveCount})`}
-        aria-current={view === 'dashboard' && filter === 'LIVE' ? 'page' : undefined}
+        aria-current={
+          view === 'dashboard' && filter === 'LIVE' ? 'page' : undefined
+        }
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold relative transition-colors ${
           view === 'dashboard' && filter === 'LIVE'
             ? 'text-brand'
@@ -74,9 +85,9 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       <button
         onClick={onOpenAddModal}
         aria-label='Crear apuesta'
-        className='w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-brand to-orange-400 text-white flex items-center justify-center shadow-lg shadow-orange-950/60 border-2 border-base active:scale-95 transition-all'
+        className='w-12 h-12 -mt-5 rounded-full bg-linear-to-tr from-brand to-orange-400 text-white flex items-center justify-center shadow-lg shadow-orange-950/60 border-2 border-base active:scale-95 transition-all'
       >
-        <Plus className='w-6 h-6 stroke-[3]' />
+        <Plus className='w-6 h-6 stroke-3' />
       </button>
 
       {/* Tab 3: Notas (Diario) */}
@@ -105,9 +116,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       {/* Tab 5: Simulador */}
       <button
         onClick={toggleSimulation}
-        aria-label={
-          isSimulating ? 'Desactivar simulador' : 'Activar simulador'
-        }
+        aria-label={isSimulating ? 'Desactivar simulador' : 'Activar simulador'}
         aria-pressed={isSimulating}
         className={`flex flex-col items-center gap-1 text-[10px] font-mono font-semibold transition-colors ${
           isSimulating ? 'text-emerald-400' : 'text-slate-400'

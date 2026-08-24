@@ -93,34 +93,31 @@ export const LiveFeedSidebar: React.FC = () => {
           </div>
 
           <div className='space-y-2'>
-            {pendingConditions
-              .map((cond) => (
-                <div
-                  key={cond.id}
-                  className='p-2 bg-base rounded border border-white/5 text-xs'
-                >
-                  <div className='flex justify-between items-center text-slate-300 font-medium'>
-                    <span className='truncate max-w-[180px]'>
-                      {cond.selection}
-                    </span>
-                    <span className='text-orange-400 font-mono-numbers font-bold text-[11px]'>
-                      {formatConditionValue(cond)}
-                    </span>
-                  </div>
-                  <div className='w-full bg-panel h-1 rounded-full overflow-hidden mt-1.5'>
-                    <div
-                      className='bg-brand h-full rounded-full'
-                      style={{ width: `${cond.progress}%` }}
-                    />
-                  </div>
+            {pendingConditions.map((cond) => (
+              <div
+                key={cond.id}
+                className='p-2 bg-base rounded border border-white/5 text-xs'
+              >
+                <div className='flex justify-between items-center text-slate-300 font-medium'>
+                  <span className='truncate max-w-45'>{cond.selection}</span>
+                  <span className='text-orange-400 font-mono-numbers font-bold text-[11px]'>
+                    {formatConditionValue(cond)}
+                  </span>
                 </div>
-              ))}
+                <div className='w-full bg-panel h-1 rounded-full overflow-hidden mt-1.5'>
+                  <div
+                    className='bg-brand h-full rounded-full'
+                    style={{ width: `${cond.progress}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* Quick Pro Tips / Anti-Tilt Box */}
-      <div className='p-3.5 rounded bg-gradient-to-br from-surface to-[#181B26] border border-orange-500/20'>
+      <div className='p-3.5 rounded bg-linear-to-br from-surface to-[#181B26] border border-orange-500/20'>
         <div className='flex items-center gap-2 text-xs font-bold text-orange-400 uppercase font-mono mb-1'>
           <span>🛡️ Bankroll Guard</span>
         </div>
