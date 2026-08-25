@@ -13,6 +13,7 @@ import {
   detectApiCategory,
 } from '../utils/liveSync';
 import { SPORT_OPTIONS } from '../data/sports';
+import { KNOWN_MARKETS } from '../data/markets';
 import {
   parseInputToDecimal,
   type OddsFormat,
@@ -458,6 +459,12 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         }}
         className='space-y-4'
       >
+        {/* Autocompletado nativo de mercados canónicos (compartido) */}
+        <datalist id='abm-market-options'>
+          {KNOWN_MARKETS.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
         {/* ================= PASO 1: PARTIDO ================= */}
         {step === 1 && (
           <>
@@ -711,22 +718,23 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 const apiCategory = detectApiCategory(c.market, c.selection);
                 const auto = apiCategory !== null;
                 return (
-                  <div
-                    key={cIdx}
-                    className='p-2.5 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
-                  >
-                    <input
-                      type='text'
-                      aria-label={`Mercado condición ${cIdx + 1}`}
-                      placeholder='Mercado'
-                      value={c.market}
-                      onChange={(e) =>
-                        handleConditionChange(cIdx, 'market', e.target.value)
-                      }
-                      className='bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white sm:w-1/3 focus:border-brand focus:outline-none'
-                    />
+                    <div
+                      key={cIdx}
+                      className='min-w-0 p-2.5 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
+                    >
+                      <input
+                        type='text'
+                        list='abm-market-options'
+                        aria-label={`Mercado condición ${cIdx + 1}`}
+                        placeholder='Mercado'
+                        value={c.market}
+                        onChange={(e) =>
+                          handleConditionChange(cIdx, 'market', e.target.value)
+                        }
+                        className='w-full sm:w-1/3 min-w-0 bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
+                      />
 
-                    <div className='sm:w-1/3 w-full'>
+                      <div className='sm:w-1/3 w-full min-w-0'>
                       <input
                         type='text'
                         aria-label={`Selección condición ${cIdx + 1}`}
@@ -757,7 +765,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                       )}
                     </div>
 
-                    <div className='flex items-center gap-1.5 sm:w-1/3 justify-end'>
+                      <div className='flex items-center gap-1.5 sm:w-1/3 min-w-0 justify-end'>
                       <div className='flex items-center gap-1 text-xs font-mono'>
                         <input
                           type='number'
