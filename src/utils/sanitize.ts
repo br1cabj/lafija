@@ -188,6 +188,7 @@ function sanitizeBet(raw: unknown): Bet | null {
         ? b.cashoutValue
         : null,
     conditions,
+    extraMatches: sanitizeExtraMatches(b.extraMatches),
     createdAt: safeString(b.createdAt, new Date().toISOString()),
     notes: typeof b.notes === 'string' ? b.notes : undefined,
     tags: Array.isArray(b.tags)
@@ -202,6 +203,35 @@ export function sanitizeBets(raw: unknown): Bet[] {
   return raw
     .map(sanitizeBet)
     .filter((b): b is Bet => b !== null);
+}
+
+const MATCH_STATUSES = ['SCHEDULED', 'LIVE', 'FINISHED', 'POSTPONED'] as const;
+
+/** Partidos extra del builder multi-partido; descarta basura. */
+function sanitizeExtraMatches(
+  raw: unknown,
+): Bet['extraMatches'] {
+  if (!Array.isArray(raw)) return undefined;
+  const out: NonNullable<Bet['extraMatches']> = [];
+  for (const item of raw.slice(0, 20)) {
+    if (typeof item !== 'object' || item === null) continue;
+    const m = item as Record<string, unknown>;
+    const home = safeString(m.homeTeam).slice(0, 100);
+    const away = safeString(m.awayTeam).slice(0, 100);
+    if (!home || !away) continue;
+    out.push({
+      key: safeString(m.key).slice(0, 210) || `${home}|${away}`.toLowerCase(),
+      homeTeam: home,
+      awayTeam: away,
+      homeScore: safeNumber(m.homeScore, 0, 0, 999),
+      awayScore: safeNumber(m.awayScore, 0, 0, 999),
+      minute: safeString(m.minute).slice(0, 12),
+      status: (MATCH_STATUSES as readonly string[]).includes(String(m.status))
+        ? (m.status as Bet['match']['status'])
+        : 'SCHEDULED',
+    });
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 /** Filtra/repara una lista de notas de origen desconocido. */

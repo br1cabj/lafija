@@ -5,6 +5,7 @@ import type {
   BetType,
   ConditionStatus,
   ConditionMatch,
+  ExtraMatchInfo,
   SportType,
 } from '../types/bet';
 import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
@@ -335,7 +336,19 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     });
 
     const moreMatches = multiMatch ? ` +${filledGroups.length - 1}` : '';
+    const extraMatches: ExtraMatchInfo[] | undefined = multiMatch
+      ? filledGroups.slice(1).map((g) => ({
+          key: `${(g.homeTeam || 'equipo').toLowerCase()}|${(g.awayTeam || 'equipo').toLowerCase()}`,
+          homeTeam: g.homeTeam || 'Equipo Local',
+          awayTeam: g.awayTeam || 'Equipo Visitante',
+          homeTeamId: g.homeTeamId,
+          awayTeamId: g.awayTeamId,
+          ...(isLive ? { homeScore: 0, awayScore: 0, minute: "01'" } : {}),
+          status: (isLive ? 'LIVE' : 'SCHEDULED') as ExtraMatchInfo['status'],
+        }))
+      : undefined;
     addBet({
+      extraMatches,
       title: `${primary.homeTeam || 'Equipo 1'} vs ${primary.awayTeam || 'Equipo 2'}${moreMatches} // ${betType.toUpperCase()}`,
       sport,
       league: league || 'Liga Principal',

@@ -933,6 +933,78 @@ test('diccionario marca trackeables los mercados por equipo y manuales los demas
   }
 });
 
+// ---- 13. partidos extra del builder multi-partido ------------------------------
+
+console.log('\n[13] partidos extra');
+
+test('applyLiveUpdate llena extraMatches con marcador del segundo partido', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'a', market: 'Goles Totales', selection: 'Más de 0.5 goles', targetValue: 1 }),
+      cond({ id: 'b', market: 'Tarjetas', selection: 'Más de 3.5 tarjetas Flamengo', targetValue: 99 }),
+    ],
+  });
+  const links = findFixturesForBet(b, [fA, fB]);
+  const r = applyLiveUpdate(b, links, new Map());
+  const extras = r.bet.extraMatches;
+  assert(Array.isArray(extras) && extras.length === 1, 'un partido extra');
+  assert(extras![0].homeTeam === 'Flamengo', `home=${extras![0].homeTeam}`);
+  assert(extras![0].homeScore === fB.homeScore, 'marcador copiado del fixture');
+});
+
+test('merge idempotente: no duplica ni pierde entradas previas', () => {
+  const b = bet({
+    status: 'LIVE',
+    extraMatches: [
+      {
+        key: 'flamengo|palmeiras',
+        homeTeam: 'Flamengo',
+        awayTeam: 'Palmeiras',
+        homeScore: 1,
+        awayScore: 0,
+        minute: "10'",
+        status: 'LIVE' as const,
+      },
+    ],
+    conditions: [
+      cond({ id: 'b', market: 'Tarjetas', selection: 'Más de 3.5 tarjetas Flamengo', targetValue: 99 }),
+    ],
+  });
+  const links = findFixturesForBet(b, [fA, { ...fB, homeScore: 3, awayScore: 1 }]);
+  const r = applyLiveUpdate(b, links, new Map());
+  const extras = r.bet.extraMatches!;
+  assert(extras.length === 1, `sin duplicados, dio ${extras.length}`);
+  assert(extras[0].key === 'flamengo|palmeiras', 'conserva la clave original');
+  assert(extras[0].homeScore === 3, `refresca el marcador, dio ${extras[0].homeScore}`);
+});
+
+test('sanitizeExtraMatches descarta basura y repara campos', () => {
+  const raw = [
+    {
+      id: 'b1', title: 'T', sport: 'football', league: 'L', type: 'parlay',
+      match: { homeTeam: 'A', awayTeam: 'B', status: 'LIVE' },
+      stake: 10, odds: 2, potentialPayout: 20, bookmaker: 'X',
+      status: 'LIVE', createdAt: new Date().toISOString(), tags: [],
+      conditions: [
+        { id: 'c1', market: 'G', selection: '+1.5', targetValue: 2, currentValue: 0, progress: 0, status: 'IN_PROGRESS', isLock: false },
+      ],
+      extraMatches: [
+        { key: 'k', homeTeam: 'Flamengo', awayTeam: 'Palmeiras', homeScore: -5, minute: "90'", status: 'LIVE' },
+        { homeTeam: '', awayTeam: '' },
+        'basura',
+        { key: 'x', homeTeam: 'C', awayTeam: 'D', status: 'ESTADO_FALSO' },
+      ],
+    },
+  ];
+  const [b] = sanitizeBets(raw);
+  const em = b!.extraMatches!;
+  assert(em.length === 2, `deben sobrevivir 2, dieron ${em.length}`);
+  assert(em[0].homeScore === 0, 'marcador negativo reparado a 0');
+  assert(em[0].minute === "90'", 'minuto conservado');
+  assert(em[1].status === 'SCHEDULED', 'estado podrido -> SCHEDULED');
+});
+
 // ---- Resumo -----------------------------------------------------------------
 
 console.log(`\n${passed} tests OK, ${failures.length} fallos`);

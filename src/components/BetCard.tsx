@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, memo } from 'react';
-import type { Bet, BetCondition } from '../types/bet';
+import type { Bet, BetCondition, ExtraMatchInfo } from '../types/bet';
 import {
   effectiveOdds,
   estimateLegOdds,
@@ -82,15 +82,18 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
       : 0;
   const hasVoidedConditions = bet.conditions.some((c) => c.status === 'VOID');
 
-  // Partidos extra del builder multi-partido (patas con match propio)
-  const extraMatches = new Set(
+  // Partidos extra del builder multi-partido: con datos en vivo si el sync
+  // ya los actualizó; para boletas viejas, al menos los nombres declarados.
+  const extraMatchLines: ExtraMatchInfo[] =
+    bet.extraMatches ??
     bet.conditions
       .filter((c) => c.match)
-      .map(
-        (c) =>
-          normalizeName(`${c.match!.homeTeam} ${c.match!.awayTeam}`),
-      ),
-  ).size;
+      .map((c) => ({
+        key: normalizeName(`${c.match!.homeTeam}|${c.match!.awayTeam}`),
+        homeTeam: c.match!.homeTeam,
+        awayTeam: c.match!.awayTeam,
+        status: 'SCHEDULED' as const,
+      }));
   const effOdds = hasVoidedConditions ? effectiveOdds(bet) : bet.odds;
   const effPayout = bet.stake * effOdds;
 
@@ -334,19 +337,52 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
           )}
           <span className='text-xs font-normal text-slate-500'>vs</span>
           <span>{bet.match.awayTeam}</span>
-          {extraMatches > 0 && (
-            <span
-              title={bet.conditions
-                .filter((c) => c.match)
-                .map((c) => `${c.match!.homeTeam} vs ${c.match!.awayTeam}`)
-                .join(' · ')}
-              className='rounded-sm border border-white/10 bg-base px-1.5 py-0.5 text-[10px] font-bold text-sky-300'
-            >
-              +{extraMatches} partido{extraMatches > 1 ? 's' : ''}
-            </span>
-          )}
         </h3>
       </button>
+
+      {/* Partidos extra del builder multi-partido, cada uno con su marcador */}
+      {extraMatchLines.length > 0 && (
+        <div className='mb-3 space-y-1'>
+          {extraMatchLines.map((em) => (
+            <div
+              key={em.key}
+              className='flex items-center gap-2 text-sm text-slate-300'
+            >
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  em.status === 'LIVE'
+                    ? 'animate-pulse bg-red-500'
+                    : em.status === 'FINISHED'
+                      ? 'bg-slate-600'
+                      : 'bg-sky-500/70'
+                }`}
+                title={
+                  em.status === 'LIVE'
+                    ? 'En vivo'
+                    : em.status === 'FINISHED'
+                      ? 'Finalizado'
+                      : em.status === 'POSTPONED'
+                        ? 'Suspendido'
+                        : 'Programado'
+                }
+              />
+              <span className='truncate'>{em.homeTeam}</span>
+              {em.homeScore !== undefined && (
+                <span className='font-mono-numbers shrink-0 rounded-sm border border-white/10 bg-base px-1.5 text-xs font-bold text-sky-300'>
+                  {em.homeScore} - {em.awayScore}
+                </span>
+              )}
+              <span className='text-xs font-normal text-slate-500'>vs</span>
+              <span className='truncate'>{em.awayTeam}</span>
+              {em.minute && (
+                <span className='font-mono-numbers shrink-0 text-[10px] text-slate-500'>
+                  {em.minute}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Banner de suspensión detectada por datos reales */}
       {isSuspended && !hasVoidedConditions && (

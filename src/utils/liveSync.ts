@@ -1,4 +1,4 @@
-import type { Bet, BetCondition, MatchInfo } from '../types/bet';
+import type { Bet, BetCondition, ExtraMatchInfo, MatchInfo } from '../types/bet';
 import { isNumericCondition } from '../types/bet';
 import { computeCashout } from './simulation';
 import { expandAlias } from '../data/teamAliases';
@@ -319,8 +319,25 @@ function mapMatchInfo(
   fixture: LiveFixture,
   current: MatchInfo,
 ): MatchInfo {
+  const { status, period } = mapFixtureStatus(fixture, current.period ?? '1H');
+
+  return {
+    ...current,
+    homeScore: fixture.homeScore,
+    awayScore: fixture.awayScore,
+    minute: fixture.minute || current.minute,
+    period,
+    status,
+  };
+}
+
+/** Estado/período del fixture según el código del proveedor. */
+function mapFixtureStatus(
+  fixture: LiveFixture,
+  currentPeriod: NonNullable<MatchInfo['period']>,
+): { status: MatchInfo['status']; period: MatchInfo['period'] } {
   let status: MatchInfo['status'] = 'LIVE';
-  let period: MatchInfo['period'] = current.period ?? '1H';
+  let period: MatchInfo['period'] = currentPeriod;
 
   switch (fixture.statusShort) {
     case '1H':
@@ -338,7 +355,6 @@ function mapMatchInfo(
       break;
     case 'LIVE':
       status = 'LIVE';
-      period = current.period ?? '1H';
       break;
     case 'HT':
       status = 'LIVE';
@@ -362,14 +378,7 @@ function mapMatchInfo(
       break;
   }
 
-  return {
-    ...current,
-    homeScore: fixture.homeScore,
-    awayScore: fixture.awayScore,
-    minute: fixture.minute || current.minute,
-    period,
-    status,
-  };
+  return { status, period };
 }
 
 export interface LiveSyncResult {
@@ -445,7 +454,52 @@ export function applyLiveUpdate(
       match: mapMatchInfo(primary, bet.match),
       cashoutValue: computeCashout(bet, newConditions),
       conditions: newConditions,
+      // Partidos extra del builder: cada uno con su marcador/minuto en vivo
+      extraMatches: mergeExtraMatches(bet, links),
     },
     newHits,
   };
+}
+
+/**
+ * Actualiza (o crea) las líneas de partidos extra del builder con los datos
+ * reales de sus fixtures. Los partidos sin fixture en el feed quedan como
+ * estaban — nunca se borran ni se inventan.
+ */
+function mergeExtraMatches(
+  bet: Bet,
+  links: BetFixtureLinks,
+): ExtraMatchInfo[] | undefined {
+  const primary = links.primary;
+  const extras = linkedFixturesOf(links).filter((f) => f !== primary);
+  if (!primary || extras.length === 0) return bet.extraMatches;
+
+  const merged = [...(bet.extraMatches ?? [])];
+  for (const f of extras) {
+    const { status } = mapFixtureStatus(f, '1H');
+    const info: ExtraMatchInfo = {
+      key: normalizeName(`${f.homeTeam}|${f.awayTeam}`),
+      homeTeam: f.homeTeam,
+      awayTeam: f.awayTeam,
+      homeScore: f.homeScore,
+      awayScore: f.awayScore,
+      minute: f.minute,
+      status,
+    };
+    const idx = merged.findIndex(
+      (e) =>
+        e.key === info.key ||
+        (namesMatch(e.homeTeam, f.homeTeam) &&
+          namesMatch(e.awayTeam, f.awayTeam)) ||
+        (namesMatch(e.homeTeam, f.awayTeam) &&
+          namesMatch(e.awayTeam, f.homeTeam)),
+    );
+    if (idx >= 0) {
+      // Conserva la clave original; refresca equipos y datos en vivo
+      merged[idx] = { ...merged[idx], ...info, key: merged[idx].key };
+    } else {
+      merged.push(info);
+    }
+  }
+  return merged;
 }

@@ -73,6 +73,21 @@ export interface MatchInfo {
 
 export type BetType = 'single' | 'parlay' | 'bet_builder';
 
+/**
+ * Partido extra de un builder multi-partido, con datos en vivo propios
+ * (marcador/minuto) para mostrarse como línea independiente en la tarjeta.
+ */
+export interface ExtraMatchInfo {
+  /** Clave estable `local|visitante` (minúsculas). */
+  key: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore?: number;
+  awayScore?: number;
+  minute?: string;
+  status: MatchInfo['status'];
+}
+
 export interface Bet {
   id: string;
   title: string;
@@ -90,6 +105,8 @@ export interface Bet {
   createdAt: string;
   notes?: string;
   tags: string[];
+  /** Partidos extra del builder multi-partido (el principal es `match`). */
+  extraMatches?: ExtraMatchInfo[];
 }
 
 export interface UserStats {
