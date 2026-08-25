@@ -1,7 +1,8 @@
 import React from 'react';
 import type { Note } from '../../types/note';
 import { useNotes } from '../../context/NotesContext';
-import { Pin, PinOff, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Pin, PinOff, Pencil, Trash2 } from 'lucide-react';
+import { toast } from '../../utils/toastBus';
 
 interface NoteCardProps {
   note: Note;
@@ -9,14 +10,24 @@ interface NoteCardProps {
   onDelete: (note: Note) => void;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('es-AR', {
-    day: '2-digit',
-    month: 'short',
+/** Fecha relativa corta: "recién", "hace 25 min", "Ayer 21:04", "12 mar". */
+function formatRelative(iso: string): string {
+  const date = new Date(iso);
+  const diffMin = Math.round((Date.now() - date.getTime()) / 60_000);
+  if (diffMin < 1) return 'recién';
+  if (diffMin < 60) return `hace ${diffMin} min`;
+  const days = Math.round(diffMin / 1440);
+  const time = date.toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit',
   });
+  if (days === 1) return `Ayer ${time}`;
+  if (days < 7) return `hace ${days} días`;
+  return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
+
+/** Umbral de corte: más que esto se muestra colapsado con "Ver más". */
+const CLAMP_LENGTH = 320;
 
 export const NoteCard: React.FC<NoteCardProps> = ({
   note,
@@ -24,12 +35,25 @@ export const NoteCard: React.FC<NoteCardProps> = ({
   onDelete,
 }) => {
   const { togglePin } = useNotes();
+  const [expanded, setExpanded] = React.useState(false);
+  const isLong = note.content.length > CLAMP_LENGTH;
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        `${note.title}\n\n${note.content}`,
+      );
+      toast.success('Nota copiada');
+    } catch {
+      toast.error('No se pudo copiar');
+    }
+  };
 
   return (
     <div
       className={`bg-surface rounded-lg p-3.5 border transition-all flex flex-col ${
         note.pinned
-          ? 'border-brand/60 shadow-md shadow-black/30'
+          ? 'border-brand/50 shadow-sm shadow-black/20'
           : 'border-white/10 hover:border-white/20'
       }`}
     >
@@ -39,6 +63,14 @@ export const NoteCard: React.FC<NoteCardProps> = ({
           {note.title}
         </h3>
         <div className='flex items-center gap-0.5 shrink-0'>
+          <button
+            onClick={handleCopy}
+            aria-label={`Copiar nota ${note.title}`}
+            title='Copiar nota'
+            className='p-1.5 rounded bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-colors'
+          >
+            <Copy className='w-3.5 h-3.5' />
+          </button>
           <button
             onClick={() => togglePin(note.id)}
             aria-label={note.pinned ? 'Desfijar nota' : 'Fijar nota'}
@@ -71,16 +103,30 @@ export const NoteCard: React.FC<NoteCardProps> = ({
       </div>
 
       {/* Content */}
-      <p className='text-xs text-slate-300 leading-relaxed whitespace-pre-wrap break-words flex-1'>
+      <p
+        className={`text-xs text-slate-300 leading-relaxed whitespace-pre-wrap break-words flex-1 ${
+          isLong && !expanded ? 'line-clamp-5' : ''
+        }`}
+      >
         {note.content}
       </p>
+      {isLong && (
+        <button
+          type='button'
+          onClick={() => setExpanded((prev) => !prev)}
+          className='mt-1 self-start text-[11px] font-semibold text-brand/90 hover:text-brand'
+        >
+          {expanded ? 'Ver menos' : 'Ver más'}
+        </button>
+      )}
 
       {/* Footer meta */}
-      <div className='mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-slate-500'>
-        <span>Creada {formatDate(note.createdAt)}</span>
-        {note.updatedAt !== note.createdAt && (
-          <span>Editada {formatDate(note.updatedAt)}</span>
-        )}
+      <div
+        className='mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-slate-500'
+        title={`Creada ${new Date(note.createdAt).toLocaleString('es-AR')}`}
+      >
+        <span>{formatRelative(note.updatedAt)}</span>
+        {note.updatedAt !== note.createdAt && <span>editada</span>}
       </div>
     </div>
   );

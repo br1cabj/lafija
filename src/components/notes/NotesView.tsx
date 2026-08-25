@@ -4,7 +4,9 @@ import { useNotes } from '../../context/NotesContext';
 import { NoteCard } from './NoteCard';
 import { NoteEditorModal } from './NoteEditorModal';
 import { ConfirmDialog } from '../ui/Dialogs';
+import { Button } from '../ui/Button';
 import { NotebookPen, Plus, Search } from 'lucide-react';
+import { toast } from '../../utils/toastBus';
 
 export const NotesView: React.FC = () => {
   const { notes, addNote, updateNote, deleteNote } = useNotes();
@@ -39,8 +41,10 @@ export const NotesView: React.FC = () => {
   const handleSave = (draft: NoteDraft) => {
     if (editorState.note) {
       updateNote(editorState.note.id, draft);
+      toast.success('Nota actualizada');
     } else {
       addNote(draft);
+      toast.success('Nota creada');
     }
   };
 
@@ -59,13 +63,10 @@ export const NotesView: React.FC = () => {
             className='w-full bg-surface border border-white/5 focus:border-brand pl-8 pr-3 py-1.5 rounded text-xs text-white placeholder-slate-500 focus:outline-none'
           />
         </div>
-        <button
-          onClick={() => setEditorState({ isOpen: true, note: null })}
-          className='flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase px-3 py-2 rounded shadow active:scale-95 transition-all shrink-0'
-        >
+        <Button size='sm' variant='primary' onClick={() => setEditorState({ isOpen: true, note: null })}>
           <Plus className='w-4 h-4' />
-          <span>Nueva Nota</span>
-        </button>
+          <span>Nueva nota</span>
+        </Button>
       </div>
 
       {/* Count */}
@@ -97,9 +98,16 @@ export const NotesView: React.FC = () => {
         </div>
       ) : filteredNotes.length === 0 ? (
         <div className='bg-surface border border-dashed border-white/10 rounded-lg p-8 text-center'>
-          <p className='text-xs text-slate-400'>
+          <p className='text-xs text-slate-400 mb-3'>
             Sin resultados para "{searchQuery}".
           </p>
+          <Button
+            size='sm'
+            variant='secondary'
+            onClick={() => setSearchQuery('')}
+          >
+            Limpiar búsqueda
+          </Button>
         </div>
       ) : (
         <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
