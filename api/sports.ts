@@ -227,11 +227,19 @@ async function handleStats(
         total: homeShots + awayShots,
       },
       cards: {
+        home:
+          getStat(0, 'Yellow Cards') + getStat(0, 'Red Cards'),
+        away:
+          getStat(1, 'Yellow Cards') + getStat(1, 'Red Cards'),
         yellow: homeYellows + awayYellows,
         red: getStat(0, 'Red Cards') + getStat(1, 'Red Cards'),
-        total: homeYellows + awayYellows,
+        total: homeYellows + awayYellows + getStat(0, 'Red Cards') + getStat(1, 'Red Cards'),
       },
-      fouls: { total: getStat(0, 'Fouls') + getStat(1, 'Fouls') },
+      fouls: {
+        home: getStat(0, 'Fouls'),
+        away: getStat(1, 'Fouls'),
+        total: getStat(0, 'Fouls') + getStat(1, 'Fouls'),
+      },
     },
   });
 }

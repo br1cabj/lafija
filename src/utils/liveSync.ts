@@ -175,6 +175,22 @@ export const API_MARKET_LABELS: Record<ApiStatCategory, string> = {
 
 const PLAYER_PROP_RE = /jugador|player|props/;
 
+// Mercados por período: las fuentes gratis no publican stats por mitad,
+// así que se declaran manuales (nunca se trackean con el total del partido).
+const HALF_RE = /1er|primer|primera|2do|segund|mitad|half/;
+// Lado explícito en el texto del mercado
+const HOME_RE = /local|home/;
+const AWAY_RE = /visitante|away/;
+
+/** Equipo de un mercado por equipo ('Córners - Local'). */
+export type MarketSide = 'home' | 'away';
+
+export interface ResolvedMarket {
+  category: ApiStatCategory;
+  /** Lado si el texto lo declara; si falta, se infiere de los equipos. */
+  side?: MarketSide;
+}
+
 /**
  * Detecta a qué categoría de la API corresponde una condición según su texto.
  * null = sin coincidencia (seguimiento manual). Orden de detección importa:
@@ -184,19 +200,61 @@ export function detectApiCategory(
   market: string,
   selection: string,
 ): ApiStatCategory | null {
+  return resolveMarket(market, selection)?.category ?? null;
+}
+
+/**
+ * Resolución completa de un mercado: categoría + lado (por equipo).
+ * Devuelve null para lo NO trackeable con datos reales:
+ * - props de jugador (ninguna fuente gratis da stats individuales)
+ * - mercados por período/mitad (sin datos en fuentes gratis)
+ * Categoría sin lado explícito = total del partido.
+ */
+export function resolveMarket(
+  market: string,
+  selection: string,
+): ResolvedMarket | null {
   const text = normalizeName(`${market} ${selection}`);
   if (!text) return null;
-  // Props de jugador: ninguna fuente gratuita da stats individuales
   if (PLAYER_PROP_RE.test(text)) return null;
+  if (HALF_RE.test(text)) return null;
 
-  if (/corner/.test(text)) return 'corners';
-  if (/tarjeta|card/.test(text)) return 'cards';
+  const side = HOME_RE.test(text)
+    ? 'home'
+    : AWAY_RE.test(text)
+      ? 'away'
+      : undefined;
+
+  if (/corner/.test(text)) return { category: 'corners', side };
+  if (/tarjeta|card/.test(text)) return { category: 'cards', side };
   if (/alarco|apuerta|ontarget|sot|encuadrado/.test(text))
-    return 'shotsOnTarget';
-  if (/tiro|remate|shot|chance/.test(text)) return 'shots';
-  if (/falta|foul/.test(text)) return 'fouls';
-  if (/gol|goal/.test(text)) return 'goals';
+    return { category: 'shotsOnTarget', side };
+  if (/tiro|remate|shot|chance/.test(text)) return { category: 'shots', side };
+  if (/falta|foul/.test(text)) return { category: 'fouls', side };
+  if (/gol|goal/.test(text)) return { category: 'goals', side };
   return null;
+}
+
+/**
+ * Infiere el lado de un mercado por equipo cuando el texto no lo dice:
+ * primero por los equipos declarados de la pata (builders multi-partido),
+ * luego por los nombres de los equipos del fixture. Solo si el match es
+ * único (un solo equipo mencionado); si hay ambigüedad, undefined.
+ */
+function inferSideFromTeams(
+  cond: BetCondition,
+  fixture: LiveFixture,
+): MarketSide | undefined {
+  const declared = cond.match;
+  if (declared?.homeTeam && declared.awayTeam) {
+    if (namesMatch(declared.homeTeam, cond.selection)) return 'home';
+    if (namesMatch(declared.awayTeam, cond.selection)) return 'away';
+  }
+  const homeHit = namesMatch(fixture.homeTeam, cond.selection);
+  const awayHit = namesMatch(fixture.awayTeam, cond.selection);
+  if (homeHit && !awayHit) return 'home';
+  if (awayHit && !homeHit) return 'away';
+  return undefined;
 }
 
 export function statForCondition(
@@ -206,21 +264,43 @@ export function statForCondition(
 ): number | null {
   if (!isNumericCondition(cond)) return null;
 
-  // Si la categoría no viene en stats (proveedor sin ese dato), null:
-  // nunca se auto-marca con ceros inventados.
-  switch (detectApiCategory(cond.market, cond.selection)) {
-    case 'corners':
-      return stats?.corners ? stats.corners.total : null;
-    case 'cards':
-      return stats?.cards ? stats.cards.total : null;
-    case 'shotsOnTarget':
-      return stats?.shotsOnTarget ? stats.shotsOnTarget.total : null;
-    case 'shots':
-      return stats?.shots ? stats.shots.total : null;
-    case 'fouls':
-      return stats?.fouls ? stats.fouls.total : null;
+  const resolved = resolveMarket(cond.market, cond.selection);
+  if (!resolved) return null;
+  const { category, side: hint } = resolved;
+  const side = hint ?? inferSideFromTeams(cond, fixture);
+
+  // Si la categoría o el lado no vienen en stats (proveedor sin ese dato),
+  // null: nunca se auto-marca con ceros inventados.
+  switch (category) {
+    case 'corners': {
+      const c = stats?.corners;
+      if (!c) return null;
+      return side ? (c[side] ?? null) : c.total;
+    }
+    case 'cards': {
+      const c = stats?.cards;
+      if (!c) return null;
+      return side ? (c[side] ?? null) : c.total;
+    }
+    case 'shotsOnTarget': {
+      const c = stats?.shotsOnTarget;
+      if (!c) return null;
+      return side ? (c[side] ?? null) : c.total;
+    }
+    case 'shots': {
+      const c = stats?.shots;
+      if (!c) return null;
+      return side ? (c[side] ?? null) : c.total;
+    }
+    case 'fouls': {
+      const c = stats?.fouls;
+      if (!c) return null;
+      return side ? (c[side] ?? null) : c.total;
+    }
     case 'goals':
-      // "Más/Menos de X goles" sobre el total del partido
+      // "Más/Menos de X goles": total del partido o goles del equipo
+      if (side === 'home') return fixture.homeScore;
+      if (side === 'away') return fixture.awayScore;
       return totalGoals(fixture);
     default:
       return null;

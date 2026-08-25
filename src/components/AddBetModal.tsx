@@ -462,7 +462,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         {/* Autocompletado nativo de mercados canónicos (compartido) */}
         <datalist id='abm-market-options'>
           {KNOWN_MARKETS.map((m) => (
-            <option key={m} value={m} />
+            <option key={m.label} value={m.label} label={m.group} />
           ))}
         </datalist>
         {/* ================= PASO 1: PARTIDO ================= */}

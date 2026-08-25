@@ -829,6 +829,110 @@ test('etiquetas API existen para todas las categorias', () => {
   }
 });
 
+// ---- 12. mercados por equipo y honestidad del diccionario ---------------------
+
+console.log('\n[12] mercados por equipo');
+
+import { resolveMarket } from '../src/utils/liveSync';
+import { KNOWN_MARKETS, isMarketAuto } from '../src/data/markets';
+
+test('mercado por equipo con palabra local -> categoria + side', () => {
+  const r = resolveMarket('Córners - Local', 'Más de 4.5');
+  assert(r?.category === 'corners' && r.side === 'home', JSON.stringify(r));
+});
+
+test('mercado por visitante en la seleccion', () => {
+  const r = resolveMarket('Tiros al Arco', 'Más de 1.5 visitante');
+  assert(r?.category === 'shotsOnTarget' && r.side === 'away', JSON.stringify(r));
+});
+
+test('mercado por periodo (1er tiempo) es HONESTO: manual, sin prometer auto', () => {
+  assert(resolveMarket('Córners 1er Tiempo', '') === null, '1T debe ser manual');
+  assert(detectApiCategory('Goles Segundo Tiempo', '') === null, '2T manual');
+});
+
+test('statForCondition usa el split home/away de stats', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'h', market: 'Córners - Local', selection: 'Más de 4.5 córners local', targetValue: 5 }),
+    ],
+  });
+  const full: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: 'Boca Juniors', awayTeam: 'River Plate',
+    corners: { home: 6, away: 3, total: 9 },
+  };
+  const r = upd(b, fixture(), full);
+  assert(r.bet.conditions[0].currentValue === 6, `local=6, dio ${r.bet.conditions[0].currentValue}`);
+});
+
+test('lado inferido por equipos declarados de la pata (sin keywords)', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'v', market: 'Tarjetas', selection: 'Más de 3.5 tarjetas Palmeiras', targetValue: 4 }),
+    ],
+  });
+  b.conditions[0].match = { homeTeam: 'Flamengo', awayTeam: 'Palmeiras' };
+  const full: LiveFixtureStats = {
+    fixtureId: 1, homeTeam: 'Boca Juniors', awayTeam: 'River Plate',
+    cards: { home: 2, away: 5, yellow: 6, red: 1, total: 7 },
+  };
+  // La pata pertenece a fB (Flamengo-Palmeiras): Palmeiras es away
+  const links = findFixturesForBet(b, [fA, { ...fB }]);
+  const statsByRef = new Map([
+    ['af-1', null],
+    ['af-2', full],
+  ]);
+  const r = applyLiveUpdate(b, links, statsByRef);
+  const v = r.bet.conditions.find((c) => c.id === 'v');
+  assert(v?.currentValue === 5, `Palmeiras(away)=5, dio ${v?.currentValue}`);
+});
+
+test('goles de un solo equipo usan el marcador del lado', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'g', market: 'Goles - Visitante', selection: 'River más de 0.5 goles visitante', targetValue: 1 }),
+    ],
+  });
+  const r = upd(b, fixture({ homeScore: 2, awayScore: 1 }), null);
+  assert(r.bet.conditions[0].currentValue === 1, `awayScore=1, dio ${r.bet.conditions[0].currentValue}`);
+});
+
+test('side sin datos de stats -> congelado (nunca inventar)', () => {
+  const b = bet({
+    status: 'LIVE',
+    conditions: [
+      cond({ id: 'x', market: 'Faltas', selection: 'Más de 10.5 faltas Boca', targetValue: 11 }),
+    ],
+  });
+  // fA no tiene stats cargadas en el mapa: faltas sin datos -> congelada
+  const links = findFixturesForBet(b, [fA]);
+  const r = applyLiveUpdate(b, links, new Map());
+  assert(r.bet.conditions[0].currentValue === 0, 'sin stats, valor inicial');
+});
+
+test('diccionario: todo mercado ⚡ lo respalda el motor y viceversa', () => {
+  for (const m of KNOWN_MARKETS) {
+    const auto = isMarketAuto(m.label);
+    const engineSaysManual = resolveMarket(m.label, '') === null;
+    assert(
+      auto !== engineSaysManual,
+      `${m.label}: diccionario=${auto ? 'auto' : 'manual'} pero motor dice lo contrario`,
+    );
+  }
+});
+
+test('diccionario marca trackeables los mercados por equipo y manuales los demas', () => {
+  for (const label of ['Córners - Local', 'Goles - Visitante', 'Tiros al Arco - Local']) {
+    assert(isMarketAuto(label), `${label} debe ser auto`);
+  }
+  for (const label of ['Córners 1er Tiempo', 'Props de Jugador', 'Ambos Anotan']) {
+    assert(!isMarketAuto(label), `${label} debe ser manual`);
+  }
+});
+
 // ---- Resumo -----------------------------------------------------------------
 
 console.log(`\n${passed} tests OK, ${failures.length} fallos`);

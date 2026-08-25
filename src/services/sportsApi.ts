@@ -40,10 +40,10 @@ export interface LiveFixtureStats {
   awayTeam: string;
   corners?: { home: number; away: number; total: number };
   /** Tiros TOTALES (incluyen los que van al arco). */
-  shots?: { total: number };
+  shots?: { home: number; away: number; total: number };
   shotsOnTarget?: { home: number; away: number; total: number };
-  cards?: { yellow: number; red: number; total: number };
-  fouls?: { total: number };
+  cards?: { home: number; away: number; yellow: number; red: number; total: number };
+  fouls?: { home: number; away: number; total: number };
 }
 
 export interface TeamSuggestion {
