@@ -26,17 +26,17 @@ import { tryNativeShare } from './utils/shareTicket';
 const AddBetModal = lazy(() =>
   import('./components/AddBetModal').then((m) => ({ default: m.AddBetModal })),
 );
-const AnalyticsModal = lazy(() =>
-  import('./components/AnalyticsModal').then((m) => ({
-    default: m.AnalyticsModal,
-  })),
-);
 const AuthModal = lazy(() =>
   import('./components/AuthModal').then((m) => ({ default: m.AuthModal })),
 );
 const ShareTicketModal = lazy(() =>
   import('./components/ShareTicketModal').then((m) => ({
     default: m.ShareTicketModal,
+  })),
+);
+const AnalyticsPage = lazy(() =>
+  import('./components/analytics/AnalyticsPage').then((m) => ({
+    default: m.AnalyticsPage,
   })),
 );
 const NotesView = lazy(() =>
@@ -48,7 +48,7 @@ const LiveResults = lazy(() =>
   import('./components/LiveResults').then((m) => ({ default: m.LiveResults })),
 );
 
-export type AppView = 'dashboard' | 'notes';
+export type AppView = 'dashboard' | 'notes' | 'analytics';
 
 const DashboardContent: React.FC = () => {
   const {
@@ -74,7 +74,6 @@ const DashboardContent: React.FC = () => {
   const { isAuthModalOpen } = useAuth();
   const [view, setView] = useState<AppView>('dashboard');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [selectedBetForShare, setSelectedBetForShare] = useState<Bet | null>(
     null,
   );
@@ -141,13 +140,17 @@ const DashboardContent: React.FC = () => {
       {/* Main Header */}
       <Header
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
         onOpenNotes={() => setView('notes')}
+        onOpenAnalytics={() => setView('analytics')}
       />
 
       {/* Main Container */}
       <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-8 lg:py-8'>
-        {view === 'notes' ? (
+        {view === 'analytics' ? (
+          <Suspense fallback={<PageLoader />}>
+            <AnalyticsPage />
+          </Suspense>
+        ) : view === 'notes' ? (
           <Suspense fallback={<PageLoader />}>
             <NotesView />
           </Suspense>
@@ -273,15 +276,6 @@ const DashboardContent: React.FC = () => {
         </Suspense>
       )}
 
-      {isAnalyticsModalOpen && (
-        <Suspense fallback={<PageLoader />}>
-          <AnalyticsModal
-            isOpen
-            onClose={() => setIsAnalyticsModalOpen(false)}
-          />
-        </Suspense>
-      )}
-
       {selectedBetForShare && (
         <Suspense fallback={<PageLoader />}>
           <ShareTicketModal
@@ -303,7 +297,6 @@ const DashboardContent: React.FC = () => {
         view={view}
         onChangeView={setView}
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
       />
 
       {/* Feedback no bloqueante (éxitos/errores) */}

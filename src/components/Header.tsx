@@ -19,16 +19,16 @@ import {
 
 interface HeaderProps {
   onOpenAddModal: () => void;
-  onOpenAnalyticsModal: () => void;
   onOpenNotes: () => void;
+  onOpenAnalytics: () => void;
 }
 
 type HeaderDialog = 'bankroll' | 'clear' | null;
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddModal,
-  onOpenAnalyticsModal,
   onOpenNotes,
+  onOpenAnalytics,
 }) => {
   const {
     stats,
@@ -118,7 +118,7 @@ export const Header: React.FC<HeaderProps> = ({
             <NotebookPen className='h-4 w-4' />
           </IconButton>
           <IconButton
-            onClick={onOpenAnalyticsModal}
+            onClick={onOpenAnalytics}
             aria-label='Ver estadísticas'
             title='Estadísticas'
             className='hidden md:inline-flex'

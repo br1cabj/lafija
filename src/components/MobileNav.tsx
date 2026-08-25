@@ -13,14 +13,12 @@ interface MobileNavProps {
   view: AppView;
   onChangeView: (view: AppView) => void;
   onOpenAddModal: () => void;
-  onOpenAnalyticsModal: () => void;
 }
 
 export const MobileNav: React.FC<MobileNavProps> = ({
   view,
   onChangeView,
   onOpenAddModal,
-  onOpenAnalyticsModal,
 }) => {
   const { filter, setFilter, counts } = useBets();
   const liveCount = counts.live;
@@ -104,7 +102,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 
       {/* Tab 4: Métricas */}
       <button
-        onClick={onOpenAnalyticsModal}
+        onClick={() => onChangeView('analytics')}
         aria-label='Ver métricas'
         className='flex flex-col items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-white transition-colors'
       >
