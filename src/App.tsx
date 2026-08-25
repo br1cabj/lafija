@@ -11,7 +11,9 @@ import { MobileNav } from './components/MobileNav';
 import { LiveFeedSidebar } from './components/LiveFeedSidebar';
 import type { Bet } from './types/bet';
 import { isSupabaseConfigured } from './services/supabase';
-import { Plus, Search, ShieldCheck, Zap } from 'lucide-react';
+import { Radio, Search, ShieldCheck, Volume2, VolumeX, Zap } from 'lucide-react';
+import { sounds } from './utils/audio';
+import { ToggleChip } from './components/ui/ToggleChip';
 import { Button } from './components/ui/Button';
 import { ADS_ENABLED } from './config/ads';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -59,7 +61,15 @@ const DashboardContent: React.FC = () => {
     retryCloudSync,
     oddsFormat,
     currencySymbol,
+    isRealMode,
+    toggleRealMode,
+    isSimulating,
+    toggleSimulation,
   } = useBets();
+  const [isMuted, setIsMuted] = useState(sounds.isMuted);
+  const handleToggleSound = () => {
+    setIsMuted(sounds.toggleMute());
+  };
   const { user } = useAuth();
   const { isAuthModalOpen } = useAuth();
   const [view, setView] = useState<AppView>('dashboard');
@@ -133,7 +143,6 @@ const DashboardContent: React.FC = () => {
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
         onOpenNotes={() => setView('notes')}
-        activeView={view}
       />
 
       {/* Main Container */}
@@ -158,21 +167,41 @@ const DashboardContent: React.FC = () => {
                 {/* Minimal Filters */}
                 <FilterBar />
 
-                <div className='mb-2 flex items-center justify-between'>
+                <div className='mb-2 flex flex-wrap items-center justify-between gap-2'>
                   <span className='font-mono-numbers text-xs text-slate-500'>
                     {filteredBets.length}{' '}
                     {filteredBets.length === 1 ? 'apuesta' : 'apuestas'}
                   </span>
 
-                  <Button
-                    size='sm'
-                    variant='ghost'
-                    className='text-brand hover:bg-brand/10 hover:text-brand'
-                    onClick={() => setIsAddModalOpen(true)}
-                  >
-                    <Plus className='h-3.5 w-3.5' />
-                    <span>Nueva apuesta</span>
-                  </Button>
+                  {/* Controles rápidos: estado siempre visible, sin menús */}
+                  <div className='flex items-center gap-1.5'>
+                    <ToggleChip
+                      label='Datos reales'
+                      icon={<Radio className='h-3.5 w-3.5' />}
+                      checked={isRealMode}
+                      onChange={toggleRealMode}
+                    />
+                    <ToggleChip
+                      label='Simulador'
+                      icon={<Zap className='h-3.5 w-3.5' />}
+                      checked={isSimulating}
+                      onChange={toggleSimulation}
+                      activeClass='border-brand/50 bg-brand/10 text-brand'
+                    />
+                    <ToggleChip
+                      label='Sonido'
+                      icon={
+                        isMuted ? (
+                          <VolumeX className='h-3.5 w-3.5' />
+                        ) : (
+                          <Volume2 className='h-3.5 w-3.5' />
+                        )
+                      }
+                      checked={!isMuted}
+                      onChange={handleToggleSound}
+                      activeClass='border-white/25 bg-white/10 text-white'
+                    />
+                  </div>
                 </div>
 
                 {filteredBets.length === 0 ? (

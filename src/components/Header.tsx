@@ -2,124 +2,62 @@ import React, { useState, useRef } from 'react';
 import { useBets } from '../context/BetContext';
 import { useAuth } from '../context/AuthContext';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { sounds } from '../utils/audio';
 import { OddsFormatTabs } from './ui/OddsFormatTabs';
 import { ConfirmDialog, NumberInputDialog } from './ui/Dialogs';
 import { Button, IconButton } from './ui/Button';
 import {
   Plus,
-  Zap,
   BarChart2,
   User,
   LogOut,
   Shield,
-  Volume2,
-  VolumeX,
   Trash2,
   DollarSign,
   Download,
   NotebookPen,
-  RadioTower,
-  Settings2,
 } from 'lucide-react';
-import type { AppView } from '../App';
 
 interface HeaderProps {
   onOpenAddModal: () => void;
   onOpenAnalyticsModal: () => void;
   onOpenNotes: () => void;
-  activeView: AppView;
 }
 
 type HeaderDialog = 'bankroll' | 'clear' | null;
-
-interface SettingsItemProps {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  activeHint?: string;
-  onClick: () => void;
-  'aria-label'?: string;
-  'aria-current'?: boolean;
-}
-
-const SettingsItem: React.FC<SettingsItemProps> = ({
-  icon,
-  label,
-  active = false,
-  activeHint = 'Activo',
-  onClick,
-  ...aria
-}) => (
-  <button
-    onClick={onClick}
-    className='w-full text-left px-3 py-2 flex items-center gap-2.5 transition-colors hover:bg-white/5'
-    {...aria}
-  >
-    <span className={active ? 'text-brand' : 'text-slate-400'}>{icon}</span>
-    <span className='flex-1 text-slate-200'>{label}</span>
-    {active && (
-      <span className='flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-400'>
-        <span className='h-1.5 w-1.5 rounded-full bg-emerald-400' />
-        {activeHint}
-      </span>
-    )}
-  </button>
-);
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenAddModal,
   onOpenAnalyticsModal,
   onOpenNotes,
-  activeView,
 }) => {
   const {
     stats,
     initialBankroll,
     setInitialBankroll,
-    isSimulating,
-    toggleSimulation,
     oddsFormat,
     setOddsFormat,
     currency,
     setCurrency,
     currencySymbol,
     clearAllBets,
-    isRealMode,
-    toggleRealMode,
     exportBackup,
   } = useBets();
   const { user, openAuthModal, signOut } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [isMuted, setIsMuted] = useState(sounds.isMuted);
   const [dialog, setDialog] = useState<HeaderDialog>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const settingsRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(profileRef, () => setShowProfileMenu(false), showProfileMenu);
-  useClickOutside(settingsRef, () => setShowSettings(false), showSettings);
 
-  // Escape closes any open dropdown
+  // Escape cierra el dropdown de perfil
   React.useEffect(() => {
-    if (!showProfileMenu && !showSettings) return;
+    if (!showProfileMenu) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowProfileMenu(false);
-        setShowSettings(false);
-      }
+      if (e.key === 'Escape') setShowProfileMenu(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showProfileMenu, showSettings]);
-
-  const handleToggleSound = () => {
-    const nextMuted = sounds.toggleMute();
-    setIsMuted(nextMuted);
-    if (!nextMuted) {
-      sounds.playClickSound();
-    }
-  };
+  }, [showProfileMenu]);
 
   return (
     <header className='sticky top-0 z-40 border-b border-white/10 bg-base/95 px-4 py-3 backdrop-blur-md lg:px-8'>
@@ -170,81 +108,23 @@ export const Header: React.FC<HeaderProps> = ({
             ))}
           </div>
 
-          {/* Settings Menu (secondary tools) */}
-          <div className='relative' ref={settingsRef}>
-            <IconButton
-              onClick={() => setShowSettings(!showSettings)}
-              aria-label='Ajustes'
-              aria-expanded={showSettings}
-              title='Ajustes'
-              className={showSettings ? 'border-white/25 text-white' : ''}
-            >
-              <Settings2 className='h-4 w-4' />
-            </IconButton>
-
-            {showSettings && (
-              <div className='absolute right-0 top-9 z-50 w-60 rounded-lg border border-white/15 bg-panel py-1.5 text-xs shadow-2xl'>
-                <p className='px-3 pt-1 pb-2 text-[10px] font-semibold tracking-wider text-slate-500 uppercase'>
-                  Herramientas en vivo
-                </p>
-                <SettingsItem
-                  icon={<RadioTower className='h-4 w-4' />}
-                  label='Datos reales'
-                  active={isRealMode}
-                  activeHint='Sincronizado'
-                  onClick={toggleRealMode}
-                  aria-label='Datos reales en vivo'
-                />
-                <SettingsItem
-                  icon={<Zap className='h-4 w-4' />}
-                  label='Simulador'
-                  active={isSimulating}
-                  onClick={toggleSimulation}
-                  aria-label='Simulador en vivo'
-                />
-                <SettingsItem
-                  icon={
-                    !isMuted ? (
-                      <Volume2 className='h-4 w-4' />
-                    ) : (
-                      <VolumeX className='h-4 w-4' />
-                    )
-                  }
-                  label='Efectos de sonido'
-                  active={!isMuted}
-                  onClick={handleToggleSound}
-                  aria-label={
-                    isMuted
-                      ? 'Activar efectos de sonido'
-                      : 'Silenciar efectos de sonido'
-                  }
-                />
-
-                <div className='my-1.5 border-t border-white/10' />
-
-                <SettingsItem
-                  icon={<NotebookPen className='h-4 w-4' />}
-                  label='Diario de notas'
-                  active={activeView === 'notes'}
-                  activeHint='Abierto'
-                  onClick={() => {
-                    onOpenNotes();
-                    setShowSettings(false);
-                  }}
-                  aria-current={activeView === 'notes'}
-                />
-                <SettingsItem
-                  icon={<BarChart2 className='h-4 w-4' />}
-                  label='Estadísticas'
-                  onClick={() => {
-                    onOpenAnalyticsModal();
-                    setShowSettings(false);
-                  }}
-                  aria-label='Ver estadísticas'
-                />
-              </div>
-            )}
-          </div>
+          {/* Navegación directa (desktop; en móvil son tabs del nav inferior) */}
+          <IconButton
+            onClick={onOpenNotes}
+            aria-label='Diario de notas'
+            title='Diario de notas'
+            className='hidden md:inline-flex'
+          >
+            <NotebookPen className='h-4 w-4' />
+          </IconButton>
+          <IconButton
+            onClick={onOpenAnalyticsModal}
+            aria-label='Ver estadísticas'
+            title='Estadísticas'
+            className='hidden md:inline-flex'
+          >
+            <BarChart2 className='h-4 w-4' />
+          </IconButton>
 
           {/* User Auth Profile Button / Dropdown */}
           <div className='relative' ref={profileRef}>
