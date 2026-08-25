@@ -14,7 +14,7 @@ import {
   isAutoTrackable,
   linkedFixturesOf,
   namesMatch,
-  needsStats,
+  conditionNeedsStats,
   normalizeName,
   statForCondition,
 } from '../src/utils/liveSync';
@@ -366,19 +366,19 @@ test('normalizeName con entrada hostil es estable', () => {
   assert(normalizeName('---') === '', 'puntuación');
 });
 
-// ---- 5. needsStats + statForCondition (datos parciales) ----------------------
+// ---- 5. conditionNeedsStats + statForCondition (datos parciales) --------------
 
 console.log('\n[5] stats bajo demanda');
 
 test('goles NO pide stats', () => {
   const b = bet({ conditions: [cond({ market: 'Goles Totales', selection: 'Más de 2.5' })] });
-  assert(!needsStats(b), 'goles usa marcador');
+  assert(!b.conditions.some(conditionNeedsStats), 'goles usa marcador');
 });
 
 test('córners/tarjetas/remates/faltas SÍ piden stats', () => {
   for (const sel of ['Más de 8.5 Córners', 'Menos de 3 tarjetas', 'Vinicius 2+ tiros a puerta', 'Más de 20 faltas']) {
     const b = bet({ conditions: [cond({ market: 'Props', selection: sel })] });
-    assert(needsStats(b), `${sel} debe pedir stats`);
+    assert(b.conditions.some(conditionNeedsStats), `${sel} debe pedir stats`);
   }
 });
 

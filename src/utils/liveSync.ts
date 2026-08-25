@@ -396,11 +396,6 @@ export function conditionNeedsStats(cond: BetCondition): boolean {
   return /corner|tarjeta|card|tiro|remate|shot|falta|foul/.test(text);
 }
 
-/** true si alguna pata de la apuesta necesita el endpoint de stats. */
-export function needsStats(bet: Bet): boolean {
-  return bet.conditions.some(conditionNeedsStats);
-}
-
 /**
  * Aplica los datos reales a una apuesta LIVE, con soporte multi-partido:
  * cada pata usa su propio partido (y sus stats); las genéricas usan el

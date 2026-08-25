@@ -29,31 +29,23 @@ interface CacheEntry {
 // asi N usuarios con partidos distintos comparten 1 request upstream.
 const cache = new Map<string, CacheEntry>();
 
-// ---- Guardian de cuota diaria para API-Football ----------------------------
-const DAILY_QUOTA_LIMIT = 80;
-let quotaDate = '';
-let quotaCount = 0;
+// Helpers compartidos con api/sports.ts (cuota, JSON+edge cache, guards).
+// El edge cache default de _lib (s-maxage=45, swr=60) es el de este endpoint.
+import {
+  consumeQuota,
+  fetchJson,
+  getApiKey,
+  isReadMethodOr405,
+  quotaAvailable,
+  sendJson as json,
+  type ApiReq,
+  type ApiRes,
+} from './_lib.js';
+// ÚNICA fuente de verdad del shape de stats granulares (compartida con el
+// cliente). Import solo de tipos: se borra al transpilar, sin bundle extra.
+import type { LiveFixtureStats } from '../src/services/sportsApi.js';
 
-function quotaAvailable(): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  if (quotaDate !== today) {
-    quotaDate = today;
-    quotaCount = 0;
-  }
-  return quotaCount < DAILY_QUOTA_LIMIT;
-}
-
-function consumeQuota(): void {
-  const today = new Date().toISOString().slice(0, 10);
-  if (quotaDate !== today) {
-    quotaDate = today;
-    quotaCount = 0;
-  }
-  quotaCount += 1;
-  console.warn(
-    `[api/results] cuota API-Football: ${quotaCount}/${DAILY_QUOTA_LIMIT} hoy`,
-  );
-}
+// ---- Guardian de cuota diaria para API-Football: en ./_lib -----------------
 
 export interface LiveResult {
   id: string;
@@ -93,25 +85,6 @@ function teamMatches(teamName: string, fragments: string[]): boolean {
     const nf = normalizeName(f);
     return nf !== '' && (norm.includes(nf) || nf.includes(norm));
   });
-}
-
-async function fetchJson(
-  url: string,
-  timeoutMs = 8000,
-  extraHeaders: Record<string, string> = {},
-): Promise<unknown> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'lafija-results/1.0', ...extraHeaders },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 async function cachedProvider(
@@ -255,11 +228,11 @@ function mapSportScoreStatus(status: string | undefined): string {
 }
 
 async function fetchSportScore(): Promise<LiveResult[]> {
-  const json = (await fetchJson(
+  const payload = (await fetchJson(
     'https://sportscore.com/api/widget/matches/?sport=football&limit=50',
   )) as { matches?: SportScoreMatch[] };
 
-  return (json.matches ?? [])
+  return (payload.matches ?? [])
     .filter(
       (m) =>
         m.status === 'live' &&
@@ -282,20 +255,20 @@ async function fetchSportScore(): Promise<LiveResult[]> {
 // ---- Fallback: API-Football (consume cuota; solo si los otros fallan) ------
 
 async function fetchApiFootball(): Promise<LiveResult[]> {
-  const key = process.env.SPORTS_API_KEY;
-  if (!key || key.trim() === '') return [];
+  const key = getApiKey();
+  if (!key) return [];
   // Guardián: sin cuota diaria disponible, esta ruta de la cascada se saltea
   if (!quotaAvailable()) {
     console.warn('[api/results] API-Football omitida: cuota diaria agotada');
     return [];
   }
 
-  consumeQuota();
+  consumeQuota('[api/results]');
   const res = await fetch('https://v3.football.api-sports.io/fixtures?live=all', {
-    headers: { 'x-apisports-key': key.trim() },
+    headers: { 'x-apisports-key': key },
   });
   if (!res.ok) throw new Error(`API-Sports HTTP ${res.status}`);
-  const json = (await res.json()) as {
+  const payload = (await res.json()) as {
     response?: Array<{
       fixture?: { id?: number; status?: { short?: string; elapsed?: number | null } };
       league?: { name?: string };
@@ -307,7 +280,7 @@ async function fetchApiFootball(): Promise<LiveResult[]> {
     }>;
   };
 
-  return (json.response ?? [])
+  return (payload.response ?? [])
     .filter((f) => f.teams?.home?.name && f.teams?.away?.name)
     .map((f) => ({
       id: `af-${f.fixture?.id ?? 'x'}`,
@@ -365,16 +338,8 @@ async function getAllResults(): Promise<{ source: string; results: LiveResult[] 
  * proveedor realmente las reporta. El cliente trata la ausencia como
  * "dato desconocido" y NO auto-marca condiciones con ceros inventados.
  */
-interface PartialStats {
-  fixtureId: number | string;
-  homeTeam: string;
-  awayTeam: string;
-  corners?: { home: number; away: number; total: number };
-  shots?: { home: number; away: number; total: number };
-  shotsOnTarget?: { home: number; away: number; total: number };
-  cards?: { home: number; away: number; yellow: number; red: number; total: number };
-  fouls?: { home: number; away: number; total: number };
-}
+// El shape de stats vive en src/services/sportsApi.ts (LiveFixtureStats):
+// cliente y serverless comparten definición para no desincronizarse jamás.
 
 function pair(
   home: number,
@@ -396,16 +361,16 @@ interface SportScoreDetailResponse {
 }
 
 async function handleSportScoreStats(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
   slug: string,
 ): Promise<void> {
-  const json = (await fetchJson(
+  const payload = (await fetchJson(
     `https://sportscore.com/api/widget/match/?sport=football&slug=${encodeURIComponent(slug)}`,
   )) as SportScoreDetailResponse;
 
-  const match = json.match;
+  const match = payload.match;
   if (!match) {
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
     return;
   }
 
@@ -449,11 +414,11 @@ async function handleSportScoreStats(
     fouls === null &&
     cardsTotal === 0
   ) {
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
     return;
   }
 
-  const stats: PartialStats = {
+  const stats: LiveFixtureStats = {
     fixtureId: slug,
     homeTeam: match.home_team ?? '',
     awayTeam: match.away_team ?? '',
@@ -476,7 +441,7 @@ async function handleSportScoreStats(
   if (fouls !== null)
     stats.fouls = { home: fouls.home, away: fouls.away, total: fouls.home + fouls.away };
 
-  sendJson(res, 200, { stats });
+  json(res, 200, { stats });
 }
 
 // ---- Stats vía API-Football (fallback con guardián de cuota) ---------------
@@ -501,29 +466,29 @@ function afStatValue(
 }
 
 async function handleApiFootballStats(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
   fixtureId: number,
 ): Promise<void> {
-  const key = process.env.SPORTS_API_KEY;
-  if (!key || key.trim() === '' || !quotaAvailable()) {
+  const key = getApiKey();
+  if (!key || !quotaAvailable()) {
     console.warn(
       '[api/results] stats API-Football omitida: sin key o cuota agotada',
     );
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
     return;
   }
 
-  consumeQuota();
-  const json = (await fetchJson(
+  consumeQuota('[api/results]');
+  const payload = (await fetchJson(
     `https://v3.football.api-sports.io/fixtures/statistics?fixture=${fixtureId}`,
     8000,
-    { 'x-apisports-key': key.trim() },
+    { 'x-apisports-key': key },
   )) as AfStatsResponse;
 
   // La respuesta trae un bloque por equipo; el primero es local
-  const blocks = json.response ?? [];
+  const blocks = payload.response ?? [];
   if (blocks.length < 2) {
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
     return;
   }
 
@@ -544,7 +509,7 @@ async function handleApiFootballStats(
   const foulsHome = afStatValue(home, /foul/i);
   const foulsAway = afStatValue(away, /foul/i);
 
-  sendJson(res, 200, {
+  json(res, 200, {
     stats: {
       fixtureId,
       homeTeam: blocks[0].team?.name ?? '',
@@ -580,41 +545,24 @@ async function handleApiFootballStats(
 
 /** Ejecuta un handler de stats garantizando siempre forma {stats:...}. */
 async function runStats(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
   run: () => Promise<void>,
 ): Promise<void> {
   try {
     await run();
   } catch (err) {
     console.warn('[api/results] stats fallo:', err);
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
   }
-}
-
-function sendJson(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
-  status: number,
-  body: unknown,
-): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  // s-maxage: el edge de Vercel cachea y sirve repetidas sin invocar la
-  // funcion -> protege la cuota de API-Football del polling del cliente
-  res.setHeader('Cache-Control', 'public, s-maxage=45, stale-while-revalidate=60');
-  res.end(JSON.stringify(body));
 }
 
 export default async function handler(
-  req: { method?: string; query?: Record<string, string | string[] | undefined> },
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  req: ApiReq,
+  res: ApiRes,
 ): Promise<void> {
   // Solo GET/HEAD: cualquier otro metodo bypasses el edge cache y quemaria
   // cuota al invocar la cascada. Sin body que procesar, no hay excusa.
-  const method = (req.method ?? 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'HEAD') {
-    sendJson(res, 405, { error: 'Metodo no permitido' });
-    return;
-  }
+  if (!isReadMethodOr405(req, res)) return;
 
   try {
     const query = req.query ?? {};
@@ -632,7 +580,7 @@ export default async function handler(
       if (rawId.startsWith('af-')) {
         const fixtureId = parseInt(rawId.slice(3), 10);
         if (!fixtureId) {
-          sendJson(res, 400, { error: 'Query param "stats" invalido' });
+          json(res, 400, { error: 'Query param "stats" invalido' });
           return;
         }
         await runStats(res, () => handleApiFootballStats(res, fixtureId));
@@ -640,7 +588,7 @@ export default async function handler(
         await runStats(res, () => handleSportScoreStats(res, rawId.slice(3)));
       } else {
         // ESPN u otra fuente sin endpoint de stats
-        sendJson(res, 200, { stats: null });
+        json(res, 200, { stats: null });
       }
       return;
     }
@@ -649,7 +597,7 @@ export default async function handler(
     const allParam = query.all;
     if (allParam !== undefined) {
       const { source, results } = await getAllResults();
-      sendJson(res, 200, { source, results });
+      json(res, 200, { source, results });
       return;
     }
 
@@ -662,7 +610,7 @@ export default async function handler(
       .slice(0, 12);
 
     if (fragments.length === 0) {
-      sendJson(res, 200, { source: 'none', results: [] });
+      json(res, 200, { source: 'none', results: [] });
       return;
     }
 
@@ -671,9 +619,9 @@ export default async function handler(
       (r) => teamMatches(r.homeTeam, fragments) || teamMatches(r.awayTeam, fragments),
     );
 
-    sendJson(res, 200, { source, results: filtered });
+    json(res, 200, { source, results: filtered });
   } catch (err) {
     console.error('[api/results]', err);
-    sendJson(res, 200, { source: 'none', results: [] });
+    json(res, 200, { source: 'none', results: [] });
   }
 }

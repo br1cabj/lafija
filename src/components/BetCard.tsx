@@ -1,24 +1,16 @@
-import { useState, useRef, useMemo, memo } from 'react';
+import { useState, useRef, memo } from 'react';
 import type { Bet, BetCondition, ExtraMatchInfo } from '../types/bet';
-import {
-  effectiveOdds,
-  estimateLegOdds,
-  formatConditionValue,
-  hasEstimatedLegs,
-} from '../types/bet';
+import { effectiveOdds, hasEstimatedLegs } from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
-import { Modal } from './ui/Modal';
 import {
   Ban,
   CheckCircle2,
   XCircle,
   Clock,
-  Plus,
-  Minus,
   MoreVertical,
   Trash2,
   Trophy,
@@ -27,17 +19,13 @@ import {
   ChevronUp,
   Flame,
   Play,
-  Repeat,
   RotateCcw,
   ShieldAlert,
-  Zap,
-  Hand,
 } from 'lucide-react';
-import {
-  API_MARKET_LABELS,
-  detectApiCategory,
-  normalizeName,
-} from '../utils/liveSync';
+import { normalizeName } from '../utils/liveSync';
+import { ConditionRow } from './betcard/ConditionRow';
+import { SuspendDialog } from './betcard/SuspendDialog';
+import { SwapPlayerDialog } from './betcard/SwapPlayerDialog';
 
 interface BetCardProps {
   bet: Bet;
@@ -459,180 +447,16 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
       {/* Condiciones */}
       {!isCollapsed ? (
         <ul className='mb-3 space-y-2'>
-          {bet.conditions.map((cond: BetCondition) => {
-            const isMet = cond.status === 'MET';
-            const isBusted = cond.status === 'BUSTED';
-            const isClutch = cond.status === 'CLUTCH_DANGER';
-            const isVoid = cond.status === 'VOID';
-
-            return (
-              <li
-                key={cond.id}
-                title={
-                  cond.supersubFrom
-                    ? `Super Sub — heredó de: ${cond.supersubFrom}`
-                    : cond.dangerNote
-                }
-                className={`flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm transition-colors ${
-                  isVoid
-                    ? 'border-white/5 bg-black/20 opacity-60'
-                    : isMet
-                      ? 'border-emerald-500/25 bg-emerald-500/5'
-                      : isBusted
-                        ? 'border-red-500/25 bg-red-500/5'
-                        : isClutch
-                          ? 'border-amber-500/30 bg-amber-500/5'
-                          : 'border-white/10 bg-panel'
-                }`}
-              >
-                <div className='flex min-w-0 items-center gap-2.5'>
-                  {isVoid ? (
-                    <Ban className='h-4 w-4 shrink-0 text-slate-500' />
-                  ) : isMet ? (
-                    <CheckCircle2 className='h-4 w-4 shrink-0 text-emerald-400' />
-                  ) : isBusted ? (
-                    <XCircle className='h-4 w-4 shrink-0 text-red-400' />
-                  ) : isClutch ? (
-                    <Flame className='h-4 w-4 shrink-0 fill-current text-amber-400' />
-                  ) : (
-                    <Clock className='h-4 w-4 shrink-0 text-slate-500' />
-                  )}
-                  <div className='min-w-0'>
-                    {(() => {
-                      // Chip de mercado: nombre canonico de la API cuando
-                      // hay match; el texto del usuario en ambar si no.
-                      const apiCategory = detectApiCategory(
-                        cond.market,
-                        cond.selection,
-                      );
-                      if (apiCategory) {
-                        return (
-                          <span
-                            title={`Trackeado automáticamente con datos reales: ${API_MARKET_LABELS[apiCategory]}`}
-                            className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-sky-500/25 bg-sky-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-sky-300 uppercase'
-                          >
-                            <Zap className='h-2.5 w-2.5 shrink-0' />
-                            {API_MARKET_LABELS[apiCategory]}
-                          </span>
-                        );
-                      }
-                      if (cond.market) {
-                        return (
-                          <span
-                            title={`Sin coincidencia con la API: "${cond.market}" — seguimiento manual con + / -`}
-                            className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-amber-500/25 bg-amber-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-amber-400/90 uppercase'
-                          >
-                            <Hand className='h-2.5 w-2.5 shrink-0' />
-                            {cond.market}
-                          </span>
-                        );
-                      }
-                      return null;
-                    })()}
-                    <span
-                      className={`block truncate font-medium ${
-                        isVoid
-                          ? 'text-slate-500 line-through'
-                          : isMet
-                            ? 'text-emerald-300'
-                            : isBusted
-                              ? 'text-red-300 line-through decoration-red-400/50'
-                              : isClutch
-                                ? 'text-amber-300'
-                                : cond.supersubFrom
-                                  ? 'font-semibold text-cyan-300'
-                                  : 'text-slate-200'
-                      }`}
-                    >
-                      {cond.selection}
-                    </span>
-                    {cond.supersubFrom && (
-                      <span className='flex items-center gap-1.5 text-[10px]'>
-                        <span className='truncate text-slate-500 line-through decoration-slate-600'>
-                          {cond.supersubFrom}
-                        </span>
-                        <Repeat className='h-2.5 w-2.5 shrink-0 text-cyan-400' />
-                        <span
-                          title={`Super Sub — heredó de: ${cond.supersubFrom}`}
-                          className='shrink-0 rounded-sm border border-cyan-400/40 bg-cyan-400/10 px-1 font-bold tracking-wide text-cyan-300'
-                        >
-                          SUPER SUB
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                  {cond.superSub && !isVoid && !cond.supersubFrom && (
-                    <span
-                      title='Super Sub: la línea hereda al suplente'
-                      className='shrink-0 rounded-sm border border-cyan-400/40 bg-cyan-400/10 px-1 py-0.5 text-[9px] font-bold text-cyan-300'
-                    >
-                      SS
-                    </span>
-                  )}
-                </div>
-
-                {/* Valor actual y controles +/- */}
-                <div className='font-mono-numbers flex shrink-0 items-center gap-2'>
-                  {!isVoid && (
-                    <span
-                      className={`text-sm font-bold ${isMet ? 'text-emerald-400' : isBusted ? 'text-red-400' : isClutch ? 'text-amber-400' : 'text-brand'}`}
-                    >
-                      {formatConditionValue(cond)}
-                    </span>
-                  )}
-                  {isVoid && (
-                    <button
-                      type='button'
-                      onClick={() => setShowSuspendDialog(true)}
-                      title='Ajustar cuotas del boleto con los valores reales de tu casa'
-                      className='text-[10px] font-semibold tracking-wide text-slate-500 uppercase underline decoration-dotted underline-offset-2 hover:text-slate-300'
-                    >
-                      Cuota 1.0
-                    </button>
-                  )}
-
-                  {/* Super Sub: cambiar jugador durante el partido */}
-                  {cond.superSub &&
-                    bet.status === 'LIVE' &&
-                    !isVoid &&
-                    !isMet &&
-                    !isBusted && (
-                      <button
-                        onClick={() => openSwapDialog(cond)}
-                        aria-label={`Super Sub: cambiar jugador en ${cond.selection}`}
-                        title='Super Sub: el suplente que entró hereda esta línea'
-                        className='flex h-7 w-7 items-center justify-center rounded-sm border border-white/10 text-slate-400 transition-colors duration-150 hover:border-brand/50 hover:text-brand'
-                      >
-                        <Repeat className='h-3.5 w-3.5' />
-                      </button>
-                    )}
-
-                  {typeof cond.currentValue === 'number' &&
-                    bet.status === 'LIVE' &&
-                    !isVoid &&
-                    !isMet &&
-                    !isBusted && (
-                      <div className='flex items-center gap-1 rounded-md border border-white/10 bg-black/40 p-0.5'>
-                        <button
-                          onClick={() => updateCondition(bet.id, cond.id, -1)}
-                          aria-label={`Restar 1 a ${cond.selection}`}
-                          className='flex h-7 w-7 items-center justify-center rounded-sm text-slate-300 transition-colors duration-150 hover:bg-white/10 hover:text-white'
-                        >
-                          <Minus className='h-3.5 w-3.5' />
-                        </button>
-                        <button
-                          onClick={() => updateCondition(bet.id, cond.id, 1)}
-                          aria-label={`Sumar 1 a ${cond.selection}`}
-                          className='flex h-7 w-7 items-center justify-center rounded-sm bg-brand text-white transition-colors duration-150 hover:bg-brand-hover'
-                        >
-                          <Plus className='h-3.5 w-3.5' />
-                        </button>
-                      </div>
-                    )}
-                </div>
-              </li>
-            );
-          })}
+          {bet.conditions.map((cond: BetCondition) => (
+            <ConditionRow
+              key={cond.id}
+              bet={bet}
+              cond={cond}
+              onUpdateDelta={(delta) => updateCondition(bet.id, cond.id, delta)}
+              onOpenSwap={() => openSwapDialog(cond)}
+              onOpenSuspend={() => setShowSuspendDialog(true)}
+            />
+          ))}
         </ul>
       ) : (
         /* Resumen plegado */
@@ -721,274 +545,21 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
       />
 
       {/* Diálogo: Super Sub (cambio de jugador) */}
-      <Modal
+      <SwapPlayerDialog
         isOpen={swapConditionId !== null}
         onClose={() => setSwapConditionId(null)}
-        ariaLabel='Super Sub: cambio de jugador'
-        maxWidthClass='max-w-md'
-      >
-        <h2 className='mb-1 text-sm font-semibold text-white'>
-          Super Sub — cambio de jugador
-        </h2>
-        <p className='mb-4 text-xs text-slate-400'>
-          El suplente que entró hereda la línea con la misma cuota. Editá el
-          nombre en la selección.
-        </p>
-        {swapCondition?.supersubFrom && (
-          <p className='mb-3 rounded-md border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-xs text-slate-400'>
-            Heredó de:{' '}
-            <span className='text-slate-500 line-through decoration-slate-600'>
-              {swapCondition.supersubFrom}
-            </span>{' '}
-            <span className='font-semibold text-cyan-300'>➜ suplente</span>
-          </p>
-        )}
-        <label className='mb-1 block text-[11px] font-medium tracking-wide text-slate-400 uppercase'>
-          Selección con el suplente
-        </label>
-        <input
-          type='text'
-          value={swapText}
-          onChange={(e) => setSwapText(e.target.value)}
-          autoFocus
-          className='w-full rounded-md border border-white/10 bg-base px-3 py-2 text-sm text-white transition-colors focus:border-brand focus:outline-none'
-        />
-        <div className='mt-5 flex justify-end gap-2 border-t border-white/10 pt-4'>
-          <Button variant='ghost' onClick={() => setSwapConditionId(null)}>
-            Cancelar
-          </Button>
-          <Button
-            variant='primary'
-            disabled={
-              !swapText.trim() || swapText.trim() === swapCondition?.selection
-            }
-            onClick={() => {
-              if (swapConditionId && swapText.trim()) {
-                swapPlayer(bet.id, swapConditionId, swapText.trim());
-              }
-              setSwapConditionId(null);
-            }}
-          >
-            Confirmar cambio
-          </Button>
-        </div>
-      </Modal>
+        condition={swapCondition ?? null}
+        swapText={swapText}
+        onSwapTextChange={setSwapText}
+        onConfirm={(newName) => {
+          if (swapConditionId) {
+            swapPlayer(bet.id, swapConditionId, newName);
+          }
+          setSwapConditionId(null);
+        }}
+      />
     </div>
   );
 }
 
 export const BetCard = memo(BetCardComponent);
-
-/** Diálogo de anulación por suspensión: por condición (cuota 1.0) o total. */
-const SuspendDialog: React.FC<{
-  isOpen: boolean;
-  bet: Bet;
-  onClose: () => void;
-  onVoidConditions: (ids: string[]) => void;
-  onVoidBet: () => void;
-  setConditionOdds: (betId: string, conditionId: string, odds?: number) => void;
-}> = ({ isOpen, bet, onClose, onVoidConditions, onVoidBet, setConditionOdds }) => {
-  const { oddsFormat, currencySymbol } = useBets();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [oddsDraft, setOddsDraft] = useState<Record<string, number>>({});
-  const voidable = bet.conditions.filter((c) => c.status !== 'VOID');
-
-  // Preview de liquidación aplicando los borradores de cuota + anulaciones
-  const preview = useMemo(() => {
-    if (selected.size === 0) return null;
-    const sim: Bet = {
-      ...bet,
-      conditions: bet.conditions.map((c) => {
-        const draft = oddsDraft[c.id];
-        const withDraft = draft ? { ...c, odds: draft } : c;
-        return selected.has(c.id)
-          ? { ...withDraft, status: 'VOID' as const }
-          : withDraft;
-      }),
-    };
-    return {
-      odds: effectiveOdds(sim),
-      estimated: hasEstimatedLegs(sim),
-    };
-  }, [bet, oddsDraft, selected]);
-
-  const toggle = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const close = () => {
-    setSelected(new Set());
-    setOddsDraft({});
-    onClose();
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={close}
-      ariaLabel='Suspensión del partido'
-      maxWidthClass='max-w-md'
-    >
-      <h2 className='mb-1 text-sm font-semibold text-white'>
-        Suspensión del partido
-      </h2>
-      <p className='mb-4 text-xs text-slate-400'>
-        Si el partido no se reanuda en 24-48hs (según tu casa), las selecciones
-        afectadas se anulan: aportan cuota 1.0 y el resto del ticket sigue
-        válido.
-      </p>
-
-      <div className='mb-4 space-y-1.5'>
-        {voidable.map((cond) => (
-          <button
-            key={cond.id}
-            type='button'
-            role='checkbox'
-            aria-checked={selected.has(cond.id)}
-            onClick={() => toggle(cond.id)}
-            className={`flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-xs transition-colors ${
-              selected.has(cond.id)
-                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200'
-                : 'border-white/10 bg-panel text-slate-300 hover:border-white/25'
-            }`}
-          >
-            <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${
-                selected.has(cond.id)
-                  ? 'border-amber-400 bg-amber-400 text-black'
-                  : 'border-white/25'
-              }`}
-            >
-              {selected.has(cond.id) && <CheckCircle2 className='h-3 w-3' />}
-            </span>
-            <span className='truncate'>{cond.selection}</span>
-            {typeof cond.odds === 'number' && cond.odds > 0 && (
-              <span className='ml-auto shrink-0 font-mono-numbers text-[10px] text-slate-500'>
-                @{cond.odds.toFixed(2)}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Cuotas reales por pata: para que la liquidación coincida con la casa */}
-      <details className='mb-3 rounded-md border border-white/10 bg-panel'>
-        <summary className='cursor-pointer px-3 py-2 text-xs font-medium text-slate-400 select-none hover:text-slate-200'>
-          Cargar cuotas reales del ticket{' '}
-          <span className='text-slate-600'>(opcional — mejora el cálculo)</span>
-        </summary>
-        <div className='space-y-1.5 px-3 pb-3 pt-1'>
-          {bet.conditions.map((cond) => {
-            const est = estimateLegOdds(bet).toFixed(2);
-            return (
-              <label
-                key={cond.id}
-                className='flex items-center justify-between gap-2 text-xs'
-              >
-                <span className='truncate text-slate-400'>
-                  {cond.selection}
-                </span>
-                <input
-                  type='number'
-                  step='0.01'
-                  min='1'
-                  inputMode='decimal'
-                  placeholder={est}
-                  defaultValue={
-                    typeof cond.odds === 'number' && cond.odds > 0
-                      ? cond.odds
-                      : ''
-                  }
-                  onChange={(e) =>
-                    setOddsDraft((prev) => {
-                      const next = { ...prev };
-                      const raw = e.target.value.trim();
-                      if (raw === '') delete next[cond.id];
-                      else {
-                        const v = parseFloat(raw.replace(',', '.'));
-                        if (Number.isFinite(v) && v >= 1) next[cond.id] = v;
-                      }
-                      return next;
-                    })
-                  }
-                  aria-label={`Cuota individual de ${cond.selection}`}
-                  className='w-20 shrink-0 rounded border border-white/10 bg-base px-2 py-1 text-right font-mono-numbers text-xs text-white focus:border-brand focus:outline-none'
-                />
-              </label>
-            );
-          })}
-          <p className='pt-1 text-[10px] leading-relaxed text-slate-600'>
-            Vacío = estimación automática ({estimateLegOdds(bet).toFixed(2)} por
-            pata). Con las cuotas reales de tu ticket, la liquidación coincide
-            con tu casa.
-          </p>
-        </div>
-      </details>
-
-      {/* Preview en vivo de la liquidación con la selección actual */}
-      {selected.size > 0 && preview && (
-        <div className='mb-4 flex items-center justify-between gap-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs'>
-          <div>
-            <span className='block text-[10px] tracking-wide text-slate-500 uppercase'>
-              Nueva cuota efectiva
-            </span>
-            <span className='font-mono-numbers font-bold text-orange-400'>
-              {formatOdds(preview.odds, oddsFormat)}
-              {preview.estimated && (
-                <span className='ml-1 text-[9px] font-normal text-slate-500'>
-                  (est.)
-                </span>
-              )}
-            </span>
-          </div>
-          <div className='text-right'>
-            <span className='block text-[10px] tracking-wide text-slate-500 uppercase'>
-              Retorno si ganás
-            </span>
-            <span className='font-mono-numbers font-bold text-emerald-400'>
-              {currencySymbol}
-              {(preview.odds * bet.stake).toFixed(2)}
-            </span>
-          </div>
-        </div>
-      )}
-
-      <div className='flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:justify-end'>
-        <Button variant='ghost' onClick={close}>
-          Esperar reanudación
-        </Button>
-        <Button
-          variant='secondary'
-          disabled={selected.size === 0}
-          onClick={() => {
-            // Guarda las cuotas reales cargadas antes de anular
-            for (const [condId, odds] of Object.entries(oddsDraft)) {
-              setConditionOdds(bet.id, condId, odds);
-            }
-            onVoidConditions([...selected]);
-            close();
-          }}
-        >
-          Anular selección ({selected.size})
-        </Button>
-        <Button
-          variant='danger'
-          onClick={() => {
-            onVoidBet();
-            close();
-          }}
-        >
-          Anular toda la apuesta
-        </Button>
-      </div>
-    </Modal>
-  );
-};

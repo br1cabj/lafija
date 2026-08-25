@@ -3,11 +3,21 @@
  *   -> Todos los partidos en vivo ahora mismo (cache 45s).
  * GET /api/sports?fixture=123456
  *   -> Estadisticas granulares del partido (cache 30s).
+ * GET /api/sports?teamsSearch=xxx
+ *   -> Autocomplete de equipos (cache 7 dias upstream).
  *
- * Funcion unica y autocontenida: sin imports relativos para evitar
- * problemas de resolucion ESM en el build de Vercel.
  * La API key vive SOLO server-side (env var SPORTS_API_KEY en Vercel).
+ * Helpers compartidos en ./_lib (cuota, JSON+edge cache, guards).
  */
+
+import {
+  consumeQuota,
+  getApiKey,
+  isReadMethodOr405,
+  quotaAvailable,
+  sendJson,
+  type ApiRes,
+} from './_lib.js';
 
 const API_BASE_URL = 'https://v3.football.api-sports.io';
 const LIVE_TTL_MS = 45_000;
@@ -22,36 +32,13 @@ interface CacheEntry {
 // cuentan como 1 request upstream por ventana de TTL.
 const cache = new Map<string, CacheEntry>();
 
-function getApiKey(): string | null {
-  const key = process.env.SPORTS_API_KEY;
-  return key && key.trim() !== '' ? key.trim() : null;
-}
-
-// ---- Guardian de cuota diaria para API-Football ----------------------------
-const DAILY_QUOTA_LIMIT = 80;
-let quotaDate = '';
-let quotaCount = 0;
-
-function quotaAvailable(): boolean {
-  const today = new Date().toISOString().slice(0, 10);
-  if (quotaDate !== today) {
-    quotaDate = today;
-    quotaCount = 0;
-  }
-  return quotaCount < DAILY_QUOTA_LIMIT;
-}
-
-function consumeQuota(): void {
-  const today = new Date().toISOString().slice(0, 10);
-  if (quotaDate !== today) {
-    quotaDate = today;
-    quotaCount = 0;
-  }
-  quotaCount += 1;
-  console.warn(
-    `[api/sports] cuota API-Football: ${quotaCount}/${DAILY_QUOTA_LIMIT} hoy`,
-  );
-}
+// Edge cache propio de este endpoint (autocomplete cambia poco)
+const CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+const json = (
+  res: ApiRes,
+  status: number,
+  body: unknown,
+): void => sendJson(res, status, body, CACHE_CONTROL);
 
 async function cachedUpstreamFetch(
   path: string,
@@ -65,7 +52,7 @@ async function cachedUpstreamFetch(
   if (!quotaAvailable()) {
     throw new Error('Cuota diaria de API-Football agotada');
   }
-  consumeQuota();
+  consumeQuota('[api/sports]');
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
     headers: { 'x-apisports-key': getApiKey() ?? '' },
@@ -73,13 +60,13 @@ async function cachedUpstreamFetch(
   if (!res.ok) {
     throw new Error(`API-Sports HTTP ${res.status}`);
   }
-  const json = (await res.json()) as unknown;
-  cache.set(path, { ts: now, data: json });
+  const payload = (await res.json()) as unknown;
+  cache.set(path, { ts: now, data: payload });
   if (cache.size > 100) {
     const oldest = cache.keys().next().value;
     if (oldest !== undefined) cache.delete(oldest);
   }
-  return json;
+  return payload;
 }
 
 interface TeamSuggestionRow {
@@ -93,7 +80,7 @@ async function searchApiFootballTeams(
   term: string,
 ): Promise<TeamSuggestionRow[]> {
   // TTL de 7 días: los nombres de equipos no cambian
-  const json = (await cachedUpstreamFetch(
+  const payload = (await cachedUpstreamFetch(
     `/teams?search=${encodeURIComponent(term)}`,
     7 * 24 * 60 * 60 * 1000,
   )) as {
@@ -102,7 +89,7 @@ async function searchApiFootballTeams(
     }>;
   };
 
-  return (json.response ?? [])
+  return (payload.response ?? [])
     .filter((r) => r.team?.id && r.team?.name)
     .slice(0, 8)
     .map((r) => ({
@@ -114,23 +101,11 @@ async function searchApiFootballTeams(
 
 /** Autocomplete de equipos. */
 async function handleTeamsSearch(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
   search: string,
 ): Promise<void> {
   const teams = await searchApiFootballTeams(search);
-  sendJson(res, 200, { teams, source: 'apifootball' });
-}
-
-function sendJson(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
-  status: number,
-  body: unknown,
-): void {
-  res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
-  // Edge cache: repetidas no invocan la funcion (protege la cuota)
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-  res.end(JSON.stringify(body));
+  json(res, 200, { teams, source: 'apifootball' });
 }
 
 // ---- Handlers ----
@@ -150,13 +125,13 @@ interface ApiFixture {
 }
 
 async function handleLive(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
 ): Promise<void> {
-  const json = (await cachedUpstreamFetch('/fixtures?live=all', LIVE_TTL_MS)) as {
+  const payload = (await cachedUpstreamFetch('/fixtures?live=all', LIVE_TTL_MS)) as {
     response?: ApiFixture[];
   };
 
-  const fixtures = (json.response ?? []).map((f) => ({
+  const fixtures = (payload.response ?? []).map((f) => ({
     fixtureId: f.fixture?.id ?? 0,
     league: f.league?.name ?? '',
     country: f.league?.country ?? '',
@@ -172,7 +147,7 @@ async function handleLive(
     startTime: f.fixture?.date ?? '',
   }));
 
-  sendJson(res, 200, { fixtures });
+  json(res, 200, { fixtures });
 }
 
 interface ApiStatItem {
@@ -181,17 +156,17 @@ interface ApiStatItem {
 }
 
 async function handleStats(
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
   fixtureId: number,
 ): Promise<void> {
-  const json = (await cachedUpstreamFetch(
+  const payload = (await cachedUpstreamFetch(
     `/fixtures/statistics?fixture=${fixtureId}`,
     STATS_TTL_MS,
   )) as { response?: Array<{ team?: { name?: string }; statistics?: ApiStatItem[] }> };
 
-  const teamsStats = json.response ?? [];
+  const teamsStats = payload.response ?? [];
   if (teamsStats.length < 2) {
-    sendJson(res, 200, { stats: null });
+    json(res, 200, { stats: null });
     return;
   }
 
@@ -211,7 +186,7 @@ async function handleStats(
   const homeYellows = getStat(0, 'Yellow Cards');
   const awayYellows = getStat(1, 'Yellow Cards');
 
-  sendJson(res, 200, {
+  json(res, 200, {
     stats: {
       fixtureId,
       homeTeam: teamsStats[0]?.team?.name ?? '',
@@ -246,17 +221,12 @@ async function handleStats(
 
 export default async function handler(
   req: { method?: string; query?: Record<string, string | string[] | undefined> },
-  res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void },
+  res: ApiRes,
 ): Promise<void> {
-  // Solo GET/HEAD: otros metodos bypasses el edge cache y quemarian cuota
-  const method = (req.method ?? 'GET').toUpperCase();
-  if (method !== 'GET' && method !== 'HEAD') {
-    sendJson(res, 405, { error: 'Metodo no permitido' });
-    return;
-  }
+  if (!isReadMethodOr405(req, res)) return;
 
   if (!getApiKey()) {
-    sendJson(res, 503, { error: 'SPORTS_API_KEY no configurada en el servidor' });
+    json(res, 503, { error: 'SPORTS_API_KEY no configurada en el servidor' });
     return;
   }
 
@@ -270,7 +240,7 @@ export default async function handler(
       const term = (Array.isArray(teamsSearch) ? teamsSearch[0] : teamsSearch)?.trim() ?? '';
       // Limita longitud: terminos absurdos cuestan cuota igual que uno util
       if (term.length < 3 || term.length > 60) {
-        sendJson(res, 200, { teams: [] });
+        json(res, 200, { teams: [] });
         return;
       }
       await handleTeamsSearch(res, term);
@@ -282,7 +252,7 @@ export default async function handler(
       const raw = Array.isArray(fixtureParam) ? fixtureParam[0] : fixtureParam;
       const fixtureId = parseInt(raw ?? '', 10);
       if (!fixtureId) {
-        sendJson(res, 400, { error: 'Query param "fixture" invalido' });
+        json(res, 400, { error: 'Query param "fixture" invalido' });
         return;
       }
       await handleStats(res, fixtureId);
@@ -293,6 +263,6 @@ export default async function handler(
     await handleLive(res);
   } catch (err) {
     console.error('[api/sports]', err);
-    sendJson(res, 502, { error: 'Error consultando API-Sports' });
+    json(res, 502, { error: 'Error consultando API-Sports' });
   }
 }

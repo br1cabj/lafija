@@ -3,78 +3,26 @@ import { useBets } from '../context/BetContext';
 import type {
   BetCondition,
   BetType,
-  ConditionStatus,
   ConditionMatch,
   ExtraMatchInfo,
   SportType,
 } from '../types/bet';
-import { POPULAR_BOOKMAKERS, getSuperSubLabel } from '../data/bookmakers';
-import {
-  API_MARKET_LABELS,
-  detectApiCategory,
-} from '../utils/liveSync';
-import { SPORT_OPTIONS } from '../data/sports';
-import { KNOWN_MARKETS } from '../data/markets';
-import {
-  parseInputToDecimal,
-  type OddsFormat,
-  decimalToAmerican,
-  decimalToFractional,
-  decimalToImpliedProbability,
-  convertOddsInput,
-} from '../utils/odds';
+import { getSuperSubLabel } from '../data/bookmakers';
+import type { OddsFormat } from '../utils/odds';
+import { convertOddsInput, parseInputToDecimal } from '../utils/odds';
 import { Modal } from './ui/Modal';
-import { OddsFormatTabs } from './ui/OddsFormatTabs';
-import { TeamInput } from './ui/TeamInput';
+import { Zap } from 'lucide-react';
+import { Check } from 'lucide-react';
 import {
-  Plus,
-  Trash2,
-  Zap,
-  Radio,
-  Calendar,
-  AlertCircle,
-  Check,
-  ArrowLeft,
-  ArrowRight,
-  ClipboardList,
-} from 'lucide-react';
-
-type ConditionField = keyof Pick<
-  BetCondition,
-  'market' | 'selection' | 'currentValue' | 'targetValue' | 'odds'
->;
-
-/** Fila en blanco para empezar a cargar condiciones desde cero. */
-const EMPTY_CONDITION: Omit<BetCondition, 'id'> = {
-  market: '',
-  selection: '',
-  targetValue: 1,
-  currentValue: 0,
-  progress: 0,
-  status: 'PENDING',
-  isLock: false,
-};
-
-/**
- * Grupo de condiciones que comparten un mismo partido. En builders
- * multi-partido cada grupo declara sus equipos para el tracking exacto.
- */
-interface ConditionGroup {
-  key: number;
-  homeTeam: string;
-  awayTeam: string;
-  homeTeamId?: number;
-  awayTeamId?: number;
-  conditions: Omit<BetCondition, 'id'>[];
-}
-
-let groupKeySeq = 1;
-const newGroup = (): ConditionGroup => ({
-  key: groupKeySeq++,
-  homeTeam: '',
-  awayTeam: '',
-  conditions: [{ ...EMPTY_CONDITION }],
-});
+  newDraft,
+  newGroup,
+  type ConditionDraft,
+  type ConditionGroup,
+} from './addbet/shared';
+import type { ConditionField } from './addbet/types';
+import { StepMatch } from './addbet/StepMatch';
+import { StepSelections } from './addbet/StepSelections';
+import { StepStake } from './addbet/StepStake';
 
 /** Pasos del wizard: 1 partido, 2 selecciones, 3 detalles de la apuesta. */
 type WizardStep = 1 | 2 | 3;
@@ -119,7 +67,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   const allowsMultipleMatches = betType !== 'single';
   const activeGroup = groups[Math.min(activeGroupIdx, groups.length - 1)];
 
-  /** Grupo con equipos cargados y al menos una selección con texto. */
+  /** Grupo con al menos una selección con texto. */
   const groupHasSelections = (g: ConditionGroup) =>
     g.conditions.some(
       (c) => c.selection.trim() !== '' || c.market.trim() !== '',
@@ -141,15 +89,20 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     setActiveGroupIdx((prev) => Math.max(0, prev >= gIdx ? prev - 1 : prev));
   };
 
+  /** Chip de partido: activarlo; si no tiene equipos, mandar al paso 1. */
+  const handleSelectGroup = (gIdx: number) => {
+    setActiveGroupIdx(gIdx);
+    if (!teamFilled(groups[gIdx])) setStep(1);
+  };
+
   const handleTeamChange = (
-    gIdx: number,
     side: 'home' | 'away',
     name: string,
     teamId?: number,
   ) =>
     setGroups((prev) =>
       prev.map((g, i) =>
-        i === gIdx
+        i === activeGroupIdx
           ? {
               ...g,
               ...(side === 'home'
@@ -162,17 +115,15 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
 
   // ---- Handlers de condiciones ---------------------------------------------
 
-  const recalcProgress = (
-    cond: Omit<BetCondition, 'id'>,
-  ): Omit<BetCondition, 'id'> => {
+  const recalcProgress = (cond: ConditionDraft): ConditionDraft => {
     const cur = Number(cond.currentValue) || 0;
     const tar = Number(cond.targetValue) || 1;
     const isMet = cur >= tar;
-    const status: ConditionStatus = isMet
-      ? 'MET'
+    const status = isMet
+      ? ('MET' as const)
       : matchStatus === 'PENDING'
-        ? 'PENDING'
-        : 'IN_PROGRESS';
+        ? ('PENDING' as const)
+        : ('IN_PROGRESS' as const);
     return {
       ...cond,
       progress: Math.min(100, Math.round((cur / tar) * 100)),
@@ -182,31 +133,28 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   };
 
   const mutateConditions = (
-    gIdx: number,
-    fn: (conds: Omit<BetCondition, 'id'>[]) => Omit<BetCondition, 'id'>[],
+    fn: (conds: ConditionDraft[]) => ConditionDraft[],
   ) =>
     setGroups((prev) =>
-      prev.map((g, i) => (i === gIdx ? { ...g, conditions: fn(g.conditions) } : g)),
+      prev.map((g, i) =>
+        i === activeGroupIdx ? { ...g, conditions: fn(g.conditions) } : g,
+      ),
     );
-
-  const handleAddCondition = () =>
-    mutateConditions(activeGroupIdx, (cs) => [...cs, { ...EMPTY_CONDITION }]);
-
-  const handleRemoveCondition = (cIdx: number) =>
-    mutateConditions(activeGroupIdx, (cs) => cs.filter((_, i) => i !== cIdx));
 
   const handleConditionChange = (
     cIdx: number,
     field: ConditionField,
     value: string | number,
   ) =>
-    mutateConditions(activeGroupIdx, (cs) =>
-      cs.map((c, i) => (i === cIdx ? recalcProgress({ ...c, [field]: value }) : c)),
+    mutateConditions((cs) =>
+      cs.map((c, i) =>
+        i === cIdx ? recalcProgress({ ...c, [field]: value }) : c,
+      ),
     );
 
-  const toggleSuperSub = (cIdx: number) =>
-    mutateConditions(activeGroupIdx, (cs) =>
-      cs.map((c, i) => (i === cIdx ? { ...c, superSub: !c.superSub } : c)),
+  const handleConditionOdds = (cIdx: number, odds: number | undefined) =>
+    mutateConditions((cs) =>
+      cs.map((c, i) => (i === cIdx ? recalcProgress({ ...c, odds }) : c)),
     );
 
   const addPreset = (
@@ -215,9 +163,10 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     targetValue: number,
     unit: string,
   ) =>
-    mutateConditions(activeGroupIdx, (cs) => [
+    mutateConditions((cs) => [
       ...cs,
       {
+        ...newDraft(),
         market,
         selection,
         targetValue,
@@ -234,16 +183,11 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
   /** true si el paso es alcanzable según lo ya cargado. */
   const canGoToStep = (target: WizardStep): boolean => {
     if (target <= step) return true;
-    if (target === 2) {
-      // Necesita el partido activo con equipos cargados
-      return teamFilled(groups[activeGroupIdx]);
-    }
+    if (target === 2) return teamFilled(groups[activeGroupIdx]);
     if (target === 3) {
       return (
         teamFilled(activeGroup) &&
-        groups.some(
-          (g) => teamFilled(g) && groupHasSelections(g),
-        )
+        groups.some((g) => teamFilled(g) && groupHasSelections(g))
       );
     }
     return false;
@@ -275,20 +219,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       : null;
   const decimalOdds = parsedOdds ?? 1;
   const potentialPayout = parseFloat((parsedStake * decimalOdds).toFixed(2));
-
-  const getOddsPlaceholder = () => {
-    switch (inputOddsFormat) {
-      case 'american':
-        return '+150';
-      case 'fractional':
-        return '3/2';
-      case 'implied':
-        return '40%';
-      case 'decimal':
-      default:
-        return '2.50';
-    }
-  };
 
   const canSave =
     parsedOdds !== null &&
@@ -322,9 +252,10 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
     let condSeq = 0;
     const mappedConditions: BetCondition[] = filledGroups.flatMap((g, gi) => {
       const ref = matchOf(g);
+      // rowKey es solo para React: se descarta al guardar
       return g.conditions
         .filter((c) => c.selection.trim() !== '' || c.market.trim() !== '')
-        .map((c) => ({
+        .map(({ rowKey: _rowKey, ...c }: ConditionDraft) => ({
           ...c,
           market: c.market.trim() || 'General',
           selection: c.selection.trim(),
@@ -348,7 +279,6 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         }))
       : undefined;
     addBet({
-      extraMatches,
       title: `${primary.homeTeam || 'Equipo 1'} vs ${primary.awayTeam || 'Equipo 2'}${moreMatches} // ${betType.toUpperCase()}`,
       sport,
       league: league || 'Liga Principal',
@@ -375,6 +305,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       conditions: mappedConditions,
       notes: '',
       tags: [sport, betType, bookmaker],
+      extraMatches,
     });
 
     onClose();
@@ -392,6 +323,20 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       ).length,
     0,
   );
+
+  const getOddsPlaceholder = (): string => {
+    switch (inputOddsFormat) {
+      case 'american':
+        return '+150';
+      case 'fractional':
+        return '3/2';
+      case 'implied':
+        return '40%';
+      case 'decimal':
+      default:
+        return '2.50';
+    }
+  };
 
   return (
     <Modal
@@ -472,706 +417,85 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         }}
         className='space-y-4'
       >
-        {/* Autocompletado nativo de mercados canónicos (compartido) */}
-        <datalist id='abm-market-options'>
-          {KNOWN_MARKETS.map((m) => (
-            <option key={m.label} value={m.label} label={m.group} />
-          ))}
-        </datalist>
         {/* ================= PASO 1: PARTIDO ================= */}
         {step === 1 && (
-          <>
-            {/* En Vivo vs Pre-Partido */}
-            <div className='flex bg-base p-1 rounded-lg border border-white/10 text-xs font-mono'>
-              <button
-                type='button'
-                onClick={() => setMatchStatus('LIVE')}
-                aria-pressed={matchStatus === 'LIVE'}
-                className={`flex-1 py-1.5 rounded-md transition-all font-bold flex items-center justify-center gap-1.5 ${
-                  matchStatus === 'LIVE'
-                    ? 'bg-red-600 text-white shadow-sm shadow-red-950/50'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Radio
-                  className={`w-3.5 h-3.5 ${matchStatus === 'LIVE' ? 'animate-pulse' : ''}`}
-                />
-                <span>En Vivo</span>
-              </button>
-              <button
-                type='button'
-                onClick={() => setMatchStatus('PENDING')}
-                aria-pressed={matchStatus === 'PENDING'}
-                className={`flex-1 py-1.5 rounded-md transition-all font-bold flex items-center justify-center gap-1.5 ${
-                  matchStatus === 'PENDING'
-                    ? 'bg-brand text-white shadow-sm shadow-orange-950/50'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Calendar className='w-3.5 h-3.5' />
-                <span>Pre-Partido</span>
-              </button>
-            </div>
-
-            {/* Deporte y tipo */}
-            <div className='grid grid-cols-2 gap-3'>
-              <div>
-                <label
-                  htmlFor='abm-sport'
-                  className='text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1'
-                >
-                  Deporte
-                </label>
-                <select
-                  id='abm-sport'
-                  value={sport}
-                  onChange={(e) => setSport(e.target.value as SportType)}
-                  className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
-                >
-                  {SPORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor='abm-type'
-                  className='text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1'
-                >
-                  Tipo de Apuesta
-                </label>
-                <select
-                  id='abm-type'
-                  value={betType}
-                  onChange={(e) => setBetType(e.target.value as BetType)}
-                  className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
-                >
-                  <option value='bet_builder'>Bet Builder / Combinada</option>
-                  <option value='parlay'>Parlay (varios partidos)</option>
-                  <option value='single'>Simple (1 selección)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Equipos del partido en curso */}
-            {allowsMultipleMatches && groups.length > 1 && (
-              <p className='text-[11px] font-bold tracking-wide text-brand uppercase font-mono'>
-                Partido {activeGroupIdx + 1} de {groups.length}
-              </p>
-            )}
-            <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-              <TeamInput
-                id={`abm-home-${activeGroup.key}`}
-                label='Equipo Local / Jugador 1'
-                value={activeGroup.homeTeam}
-                onChange={(name, teamId) =>
-                  handleTeamChange(activeGroupIdx, 'home', name, teamId)
-                }
-              />
-
-              <TeamInput
-                id={`abm-away-${activeGroup.key}`}
-                label='Equipo Visitante / Jugador 2'
-                value={activeGroup.awayTeam}
-                onChange={(name, teamId) =>
-                  handleTeamChange(activeGroupIdx, 'away', name, teamId)
-                }
-              />
-            </div>
-
-            {/* Liga */}
-            <div>
-              <label
-                htmlFor='abm-league'
-                className='text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1'
-              >
-                Liga / Competición{' '}
-                <span className='normal-case text-slate-600'>(opcional)</span>
-              </label>
-              <input
-                id='abm-league'
-                type='text'
-                value={league}
-                onChange={(e) => setLeague(e.target.value)}
-                className='w-full bg-base border border-white/10 rounded px-3 py-2 text-sm text-white focus:border-brand focus:outline-none'
-              />
-            </div>
-
-            {!teamFilled(activeGroup) && (
-              <p className='flex items-center gap-1.5 text-[11px] text-slate-500'>
-                <AlertCircle className='w-3.5 h-3.5 shrink-0' />
-                Cargá los dos equipos para continuar.
-              </p>
-            )}
-
-            {/* Nav paso 1 */}
-            <div className='flex items-center justify-between pt-2 border-t border-white/10'>
-              <button
-                type='button'
-                onClick={onClose}
-                className='px-4 py-2 rounded text-xs font-semibold uppercase text-slate-500 hover:text-white'
-              >
-                Cancelar
-              </button>
-              <button
-                type='button'
-                onClick={() => goToStep(2)}
-                disabled={!teamFilled(activeGroup)}
-                className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
-              >
-                Siguiente
-                <ArrowRight className='w-4 h-4' />
-              </button>
-            </div>
-          </>
+          <StepMatch
+            matchStatus={matchStatus}
+            onMatchStatusChange={setMatchStatus}
+            sport={sport}
+            onSportChange={setSport}
+            betType={betType}
+            onBetTypeChange={setBetType}
+            league={league}
+            onLeagueChange={setLeague}
+            activeGroupIdx={activeGroupIdx}
+            totalGroups={groups.length}
+            allowsMultipleMatches={allowsMultipleMatches}
+            homeTeam={activeGroup.homeTeam}
+            awayTeam={activeGroup.awayTeam}
+            groupKey={activeGroup.key}
+            onTeamChange={handleTeamChange}
+            canContinue={teamFilled(activeGroup)}
+            onNext={() => goToStep(2)}
+            onCancel={onClose}
+          />
         )}
 
         {/* ================= PASO 2: SELECCIONES ================= */}
         {step === 2 && (
-          <>
-            {/* Chips de partidos ya cargados */}
-            {allowsMultipleMatches && (
-              <div className='flex gap-1.5 flex-wrap'>
-                {groups.map((g, gi) => {
-                  const isActive = gi === activeGroupIdx;
-                  const ready = teamFilled(g);
-                  const hasSel = groupHasSelections(g);
-                  return (
-                    <span
-                      key={g.key}
-                      className={`inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pl-2 pr-0.5 text-[11px] font-semibold ${
-                        isActive
-                          ? 'border-brand bg-orange-500/15 text-brand'
-                          : 'border-white/10 bg-panel text-slate-400'
-                      }`}
-                    >
-                      <button
-                        type='button'
-                        onClick={() => {
-                          setActiveGroupIdx(gi);
-                          // Grupo sin equipos -> completarlo en el paso 1
-                          if (!ready) setStep(1);
-                        }}
-                        className='truncate max-w-[180px]'
-                        title={`${g.homeTeam || '?'} vs ${g.awayTeam || '?'}`}
-                      >
-                        {gi + 1}. {g.homeTeam || 'Sin cargar'} vs{' '}
-                        {g.awayTeam || 'Sin cargar'}
-                      </button>
-                      {hasSel && (
-                        <Check className='h-3 w-3 shrink-0 text-emerald-400' />
-                      )}
-                      {groups.length > 1 && (
-                        <button
-                          type='button'
-                          onClick={() => handleRemoveGroup(gi)}
-                          aria-label={`Quitar partido ${gi + 1}`}
-                          className='rounded-full p-0.5 hover:bg-white/10 hover:text-red-400'
-                        >
-                          <Trash2 className='h-3 w-3' />
-                        </button>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-
-            <p className='text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
-              Selecciones — {activeGroup.homeTeam} vs {activeGroup.awayTeam}
-            </p>
-
-            {/* Presets */}
-            <div className='flex gap-1.5 flex-wrap'>
-              <button
-                type='button'
-                onClick={() =>
-                  addPreset('Goles Totales', '+2.5 Goles', 2.5, 'goles')
-                }
-                className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-              >
-                +2.5 Goles
-              </button>
-              <button
-                type='button'
-                onClick={() =>
-                  addPreset('Córners Totales', '+8.5 Córners', 8.5, 'córners')
-                }
-                className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-              >
-                +8.5 Córners
-              </button>
-              <button
-                type='button'
-                onClick={() =>
-                  addPreset('Props de Jugador', 'Jugador 1+ Tiro al arco', 1, 'tiros')
-                }
-                className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-                title='Props de jugador: seguimiento manual con los botones + / -'
-              >
-                1+ Tiro a puerta (jugador)
-              </button>
-              <button
-                type='button'
-                onClick={() =>
-                  addPreset('Tiros Totales', '+25.5 Tiros totales', 25.5, 'tiros')
-                }
-                className='px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-[11px] text-slate-300'
-              >
-                +25.5 Tiros Totales
-              </button>
-            </div>
-
-            {/* Condiciones del partido activo */}
-            <div className='space-y-2'>
-              {activeGroup.conditions.map((c, cIdx) => {
-                const apiCategory = detectApiCategory(c.market, c.selection);
-                const auto = apiCategory !== null;
-                return (
-                  <div
-                    key={cIdx}
-                    className='min-w-0 p-3 bg-base rounded border border-white/10 space-y-2.5'
-                  >
-                    {/* Línea 1: mercado y selección, uno al lado del otro */}
-                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                      <input
-                        type='text'
-                        list='abm-market-options'
-                        aria-label={`Mercado condición ${cIdx + 1}`}
-                        placeholder='Mercado'
-                        value={c.market}
-                        onChange={(e) =>
-                          handleConditionChange(cIdx, 'market', e.target.value)
-                        }
-                        className='w-full min-w-0 bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
-                      />
-                      <div className='min-w-0'>
-                        <input
-                          type='text'
-                          aria-label={`Selección condición ${cIdx + 1}`}
-                          placeholder='Selección'
-                          value={c.selection}
-                          onChange={(e) =>
-                            handleConditionChange(cIdx, 'selection', e.target.value)
-                          }
-                          className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
-                        />
-                        {(c.market.trim() || c.selection.trim()) && (
-                          <span
-                            title={
-                              auto
-                                ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
-                                : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
-                            }
-                            className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
-                              auto
-                                ? 'bg-sky-500/15 text-sky-300'
-                                : 'bg-amber-500/10 text-amber-400/90'
-                            }`}
-                          >
-                            {auto
-                              ? `⚡ ${API_MARKET_LABELS[apiCategory]}`
-                              : '✋ MANUAL'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Línea 2: valores etiquetados + acciones */}
-                    <div className='flex items-end flex-wrap gap-x-2.5 gap-y-2'>
-                      <label className='flex flex-col gap-0.5'>
-                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
-                          Actual
-                        </span>
-                        <input
-                          type='number'
-                          step='0.5'
-                          min='0'
-                          aria-label='Valor actual'
-                          placeholder='0'
-                          value={c.currentValue}
-                          onChange={(e) =>
-                            handleConditionChange(
-                              cIdx,
-                              'currentValue',
-                              parseFloat(e.target.value) || 0,
-                            )
-                          }
-                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-white text-center font-mono-numbers focus:border-brand focus:outline-none'
-                        />
-                      </label>
-                      <span className='pb-[7px] text-xs font-mono text-slate-600' aria-hidden>
-                        /
-                      </span>
-                      <label className='flex flex-col gap-0.5'>
-                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
-                          Meta
-                        </span>
-                        <input
-                          type='number'
-                          step='0.5'
-                          min='0.5'
-                          aria-label='Valor objetivo'
-                          placeholder='8.5'
-                          value={c.targetValue}
-                          onChange={(e) =>
-                            handleConditionChange(
-                              cIdx,
-                              'targetValue',
-                              parseFloat(e.target.value) || 1,
-                            )
-                          }
-                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold focus:border-brand focus:outline-none'
-                        />
-                      </label>
-                      <label className='flex flex-col gap-0.5'>
-                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
-                          Cuota sel.
-                        </span>
-                        <input
-                          type='number'
-                          step='0.01'
-                          min='1'
-                          aria-label='Cuota de la selección (opcional)'
-                          title='Cuota individual — permite recalcular la apuesta si una condición se anula'
-                          placeholder='—'
-                          value={c.odds ?? ''}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            const value =
-                              raw === ''
-                                ? undefined
-                                : parseFloat(raw) || undefined;
-                            mutateConditions(activeGroupIdx, (cs) =>
-                              cs.map((cond, i) =>
-                                i === cIdx
-                                  ? recalcProgress({ ...cond, odds: value })
-                                  : cond,
-                              ),
-                            );
-                          }}
-                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-slate-300 text-center font-mono-numbers focus:border-brand focus:outline-none'
-                        />
-                      </label>
-
-                      <div className='ml-auto flex items-center gap-1 pb-0.5'>
-                        <button
-                          type='button'
-                          role='switch'
-                          aria-checked={Boolean(c.superSub)}
-                          aria-label='Super Sub: la línea hereda al suplente'
-                          title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
-                          onClick={() => toggleSuperSub(cIdx)}
-                          className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
-                            c.superSub
-                              ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
-                              : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          SS
-                        </button>
-
-                        {activeGroup.conditions.length > 1 && (
-                          <button
-                            type='button'
-                            onClick={() => handleRemoveCondition(cIdx)}
-                            aria-label={`Eliminar condición ${cIdx + 1}`}
-                            className='p-1.5 text-slate-500 hover:text-red-400'
-                          >
-                            <Trash2 className='w-3.5 h-3.5' />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <button
-                type='button'
-                onClick={handleAddCondition}
-                className='flex items-center gap-1 text-xs font-mono font-bold text-brand hover:text-orange-400'
-              >
-                <Plus className='w-3.5 h-3.5' />
-                <span>Añadir condición</span>
-              </button>
-            </div>
-
-            {/* Agregar otro partido */}
-            {allowsMultipleMatches && (
-              <button
-                type='button'
-                onClick={handleAddGroup}
-                className='w-full flex items-center justify-center gap-1.5 py-2 rounded border border-dashed border-white/20 text-xs font-mono font-bold text-slate-400 hover:text-brand hover:border-brand/50 transition-colors'
-              >
-                <Plus className='w-4 h-4' />
-                Agregar otro partido
-              </button>
-            )}
-
-            {/* Nav paso 2 */}
-            <div className='flex items-center justify-between pt-2 border-t border-white/10'>
-              <button
-                type='button'
-                onClick={() => goToStep(1)}
-                className='flex items-center gap-1 px-4 py-2 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white'
-              >
-                <ArrowLeft className='w-4 h-4' />
-                Atrás
-              </button>
-              <button
-                type='button'
-                onClick={() => goToStep(3)}
-                disabled={!canGoToStep(3)}
-                className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
-              >
-                Continuar
-                <ArrowRight className='w-4 h-4' />
-              </button>
-            </div>
-          </>
+          <StepSelections
+            groups={groups}
+            activeGroupIdx={activeGroupIdx}
+            onSelectGroup={handleSelectGroup}
+            onRemoveGroup={handleRemoveGroup}
+            activeGroup={activeGroup}
+            superSubLabel={superSubLabel}
+            allowsMultipleMatches={allowsMultipleMatches}
+            onPreset={addPreset}
+            onAddCondition={() =>
+              mutateConditions((cs) => [...cs, newDraft()])
+            }
+            onRemoveCondition={(cIdx) =>
+              mutateConditions((cs) => cs.filter((_, i) => i !== cIdx))
+            }
+            onConditionChange={handleConditionChange}
+            onToggleSuperSub={(cIdx) =>
+              mutateConditions((cs) =>
+                cs.map((c, i) =>
+                  i === cIdx ? { ...c, superSub: !c.superSub } : c,
+                ),
+              )
+            }
+            onConditionOdds={handleConditionOdds}
+            onAddGroup={handleAddGroup}
+            onBack={() => goToStep(1)}
+            onContinue={() => goToStep(3)}
+            canContinue={canGoToStep(3)}
+          />
         )}
 
         {/* ================= PASO 3: APUESTA ================= */}
         {step === 3 && (
-          <>
-            {/* Casa de apuestas */}
-            <div className='space-y-2'>
-              <div className='flex items-center justify-between'>
-                <span className='text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono'>
-                  Casa de Apuestas:{' '}
-                  <span className='text-orange-400'>{bookmaker}</span>
-                </span>
-
-                <div className='flex items-center bg-panel p-0.5 rounded text-[10px] font-mono border border-white/10'>
-                  <button
-                    type='button'
-                    onClick={() => setBookmakerRegion('AR')}
-                    aria-pressed={bookmakerRegion === 'AR'}
-                    className={`px-2 py-0.5 rounded transition-all ${
-                      bookmakerRegion === 'AR'
-                        ? 'bg-brand text-white font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🇦🇷 Argentina
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setBookmakerRegion('GLOBAL')}
-                    aria-pressed={bookmakerRegion === 'GLOBAL'}
-                    className={`px-2 py-0.5 rounded transition-all ${
-                      bookmakerRegion === 'GLOBAL'
-                        ? 'bg-brand text-white font-bold'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    🌐 Global
-                  </button>
-                </div>
-              </div>
-
-              <div className='flex gap-1.5 flex-wrap'>
-                {POPULAR_BOOKMAKERS.filter((b) =>
-                  bookmakerRegion === 'AR'
-                    ? b.region === 'AR'
-                    : b.region === 'GLOBAL' || b.region === 'CRYPTO',
-                ).map((b) => (
-                  <button
-                    key={b.id}
-                    type='button'
-                    onClick={() => setBookmaker(b.shortName)}
-                    aria-pressed={
-                      bookmaker.toLowerCase() === b.shortName.toLowerCase()
-                    }
-                    className={`px-2.5 py-1 rounded text-xs font-semibold transition-all border ${
-                      bookmaker.toLowerCase() === b.shortName.toLowerCase()
-                        ? 'bg-orange-500/20 text-brand border-brand font-bold shadow-sm'
-                        : 'bg-panel text-slate-300 border-white/5 hover:border-white/20'
-                    }`}
-                  >
-                    {b.badgeLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Stake, cuota y retorno */}
-            <div className='space-y-3'>
-              <OddsFormatTabs
-                variant='full'
-                value={inputOddsFormat}
-                onChange={handleFormatChange}
-              />
-
-              <div className='grid grid-cols-2 gap-3'>
-                <div>
-                  <label
-                    htmlFor='abm-stake'
-                    className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
-                  >
-                    Stake ($)
-                  </label>
-                  <input
-                    id='abm-stake'
-                    type='number'
-                    step='0.5'
-                    min='0.5'
-                    value={stake}
-                    onChange={(e) => setStake(e.target.value)}
-                    className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-sm text-white font-mono-numbers font-bold focus:border-brand focus:outline-none'
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor='abm-odds'
-                    className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
-                  >
-                    Cuota Total ({inputOddsFormat.toUpperCase()})
-                  </label>
-                  <input
-                    id='abm-odds'
-                    type='text'
-                    placeholder={getOddsPlaceholder()}
-                    value={oddsInput}
-                    onChange={(e) => setOddsInput(e.target.value)}
-                    aria-invalid={Boolean(oddsError)}
-                    className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-sm text-orange-400 font-mono-numbers font-bold focus:border-brand focus:outline-none'
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor='abm-bookmaker'
-                    className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'
-                  >
-                    Otra Casa (Escribir)
-                  </label>
-                  <input
-                    id='abm-bookmaker'
-                    type='text'
-                    value={bookmaker}
-                    onChange={(e) => setBookmaker(e.target.value)}
-                    className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-sm text-white focus:border-brand focus:outline-none'
-                  />
-                </div>
-
-                <div>
-                  <span className='text-[11px] font-semibold text-slate-400 uppercase block mb-1'>
-                    Retorno Máximo
-                  </span>
-                  <div className='px-2.5 py-1.5 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-400 font-mono-numbers font-extrabold text-sm'>
-                    ${potentialPayout.toFixed(2)}
-                  </div>
-                </div>
-              </div>
-
-              {oddsError && (
-                <p className='text-[11px] text-red-400 flex items-center gap-1.5 -mt-1'>
-                  <AlertCircle className='w-3.5 h-3.5 shrink-0' /> {oddsError}
-                </p>
-              )}
-
-              {/* Equivalencias */}
-              <div className='bg-surface p-2 rounded border border-white/5 flex items-center justify-between text-[11px] font-mono flex-wrap gap-2 text-slate-400'>
-                <span className='text-slate-500 uppercase text-[10px]'>
-                  Equivalencias:
-                </span>
-                <span>
-                  Decimal:{' '}
-                  <strong className='text-white font-mono-numbers'>
-                    {decimalOdds.toFixed(2)}
-                  </strong>
-                </span>
-                <span>
-                  Americana:{' '}
-                  <strong className='text-orange-400 font-mono-numbers'>
-                    {decimalToAmerican(decimalOdds)}
-                  </strong>
-                </span>
-                <span>
-                  Fraccional:{' '}
-                  <strong className='text-cyan-400 font-mono-numbers'>
-                    {decimalToFractional(decimalOdds)}
-                  </strong>
-                </span>
-                <span>
-                  Prob.:{' '}
-                  <strong className='text-emerald-400 font-mono-numbers'>
-                    {decimalToImpliedProbability(decimalOdds)}
-                  </strong>
-                </span>
-              </div>
-            </div>
-
-            {/* Preview del boleto antes de guardar */}
-            <div className='rounded border border-white/10 bg-panel/40 p-3'>
-              <span className='mb-2 flex items-center gap-1.5 text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
-                <ClipboardList className='w-3.5 h-3.5' />
-                Tu boleto ({totalSelections} selección
-                {totalSelections === 1 ? '' : 'es'}
-                {filledGroups.length > 1
-                  ? ` · ${filledGroups.length} partidos`
-                  : ''}
-                )
-              </span>
-              <div className='space-y-2'>
-                {filledGroups.map((g) => (
-                  <div key={g.key}>
-                    <p className='text-[11px] font-bold text-white'>
-                      {g.homeTeam} vs {g.awayTeam}
-                    </p>
-                    <ul className='ml-3 list-disc space-y-0.5'>
-                      {g.conditions
-                        .filter(
-                          (c) =>
-                            c.selection.trim() !== '' ||
-                            c.market.trim() !== '',
-                        )
-                        .map((c, i) => (
-                          <li
-                            key={i}
-                            className='text-[11px] leading-snug text-slate-400'
-                          >
-                            {c.selection.trim() || c.market.trim()}
-                            {typeof c.odds === 'number' && c.odds > 0 && (
-                              <span className='font-mono-numbers text-slate-500'>
-                                {' '}
-                                @{c.odds.toFixed(2)}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Nav paso 3 */}
-            <div className='flex items-center justify-between pt-2 border-t border-white/10'>
-              <button
-                type='button'
-                onClick={() => goToStep(2)}
-                className='flex items-center gap-1 px-4 py-2 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white'
-              >
-                <ArrowLeft className='w-4 h-4' />
-                Atrás
-              </button>
-              <button
-                type='submit'
-                disabled={!canSave}
-                className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
-              >
-                <Zap className='w-4 h-4 fill-white' />
-                Guardar Apuesta
-              </button>
-            </div>
-          </>
+          <StepStake
+            groups={filledGroups}
+            totalSelections={totalSelections}
+            bookmaker={bookmaker}
+            onBookmakerChange={setBookmaker}
+            bookmakerRegion={bookmakerRegion}
+            onBookmakerRegionChange={setBookmakerRegion}
+            stake={stake}
+            onStakeChange={setStake}
+            oddsInput={oddsInput}
+            onOddsInputChange={setOddsInput}
+            inputOddsFormat={inputOddsFormat}
+            onOddsFormatChange={handleFormatChange}
+            oddsError={oddsError}
+            decimalOdds={decimalOdds}
+            potentialPayout={potentialPayout}
+            canSave={canSave}
+            oddsPlaceholder={getOddsPlaceholder()}
+            onBack={() => goToStep(2)}
+          />
         )}
       </form>
     </Modal>
