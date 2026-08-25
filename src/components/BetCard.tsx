@@ -368,7 +368,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
               />
               <span className='truncate'>{em.homeTeam}</span>
               {em.homeScore !== undefined && (
-                <span className='font-mono-numbers shrink-0 rounded-sm border border-white/10 bg-base px-1.5 text-xs font-bold text-sky-300'>
+                <span className='font-mono-numbers shrink-0 rounded-sm border border-white/10 bg-base px-1.5 text-xs font-bold text-slate-300'>
                   {em.homeScore} - {em.awayScore}
                 </span>
               )}

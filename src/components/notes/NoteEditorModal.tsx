@@ -33,7 +33,7 @@ export const NoteEditorModal: React.FC<NoteEditorModalProps> = ({
       ariaLabel={note ? 'Editar nota' : 'Nueva nota'}
       maxWidthClass='max-w-lg'
     >
-      <h2 className='text-lg font-bold text-white uppercase tracking-wider font-mono mb-4'>
+      <h2 className='text-lg font-bold text-white tracking-wide mb-4'>
         {note ? 'Editar Nota' : 'Nueva Nota'}
       </h2>
 

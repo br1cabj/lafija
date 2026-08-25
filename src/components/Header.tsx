@@ -253,7 +253,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
                 aria-label={`Perfil de ${user.name}`}
                 aria-expanded={showProfileMenu}
-                className='flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-gradient-to-tr from-brand to-orange-400 text-xs font-semibold text-white'
+                className='flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-brand text-xs font-semibold text-white'
               >
                 {user.avatarUrl ? (
                   <img

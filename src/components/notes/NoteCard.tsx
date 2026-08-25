@@ -29,7 +29,7 @@ export const NoteCard: React.FC<NoteCardProps> = ({
     <div
       className={`bg-surface rounded-lg p-3.5 border transition-all flex flex-col ${
         note.pinned
-          ? 'border-brand/60 shadow-md shadow-orange-950/40'
+          ? 'border-brand/60 shadow-md shadow-black/30'
           : 'border-white/10 hover:border-white/20'
       }`}
     >

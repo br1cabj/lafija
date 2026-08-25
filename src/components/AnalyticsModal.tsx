@@ -65,7 +65,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
           <TrendingUp className='w-5 h-5' />
         </div>
         <div>
-          <h2 className='text-lg font-bold text-white uppercase tracking-wider font-mono'>
+          <h2 className='text-lg font-bold text-white tracking-wide'>
             Estadísticas & Análisis de Rendimiento
           </h2>
           <p className='text-xs text-slate-400'>
@@ -77,13 +77,13 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
       {/* Elo Rank Showcase Banner */}
       <div className='bg-linear-to-r from-panel via-[#241A12] to-panel border border-orange-500/30 rounded p-4 mb-5 flex flex-col sm:flex-row items-center justify-between gap-4'>
         <div className='flex items-center gap-3.5'>
-          <div className='w-14 h-14 rounded-lg bg-linear-to-br from-brand to-[#B33600] flex items-center justify-center shadow-lg shadow-orange-950/50 border border-orange-400/40'>
+          <div className='w-14 h-14 rounded-lg bg-brand flex items-center justify-center shadow-lg shadow-black/30'>
             <span className='text-2xl font-black text-white font-mono-numbers'>
               {stats.rankLevel}
             </span>
           </div>
           <div>
-            <span className='text-sm font-bold text-white uppercase tracking-wider font-mono'>
+            <span className='text-sm font-bold text-white tracking-wide'>
               RANGO: NIVEL {stats.rankLevel} PRO TIPSTER
             </span>
             <p className='text-xs text-slate-400 font-mono-numbers'>
@@ -159,7 +159,7 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
 
       {/* Sport Breakdown Table */}
       <div className='space-y-3'>
-        <h3 className='text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
+        <h3 className='text-xs font-bold text-orange-400 tracking-wide'>
           Rendimiento por Deporte & Mercado
         </h3>
 

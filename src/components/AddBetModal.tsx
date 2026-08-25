@@ -352,7 +352,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
           <Zap className='w-5 h-5' />
         </div>
         <div>
-          <h2 className='text-base lg:text-lg font-bold text-white uppercase tracking-wider font-mono'>
+          <h2 className='text-base lg:text-lg font-semibold tracking-tight text-white'>
             Nueva Apuesta
           </h2>
           <p className='text-[11px] text-slate-400'>

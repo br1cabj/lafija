@@ -71,7 +71,7 @@ export const StepMatch: React.FC<StepMatchProps> = ({
           aria-pressed={matchStatus === 'PENDING'}
           className={`flex-1 py-1.5 rounded-md transition-all font-bold flex items-center justify-center gap-1.5 ${
             matchStatus === 'PENDING'
-              ? 'bg-brand text-white shadow-sm shadow-orange-950/50'
+              ? 'bg-brand text-white shadow-sm shadow-black/30'
               : 'text-slate-400 hover:text-white'
           }`}
         >

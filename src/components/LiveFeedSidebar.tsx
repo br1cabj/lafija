@@ -30,7 +30,7 @@ export const LiveFeedSidebar: React.FC = () => {
             ) : (
               <span className='h-2 w-2 rounded-full bg-slate-600' />
             )}
-            <h3 className='text-xs font-semibold tracking-wider text-white uppercase'>
+            <h3 className='text-xs font-semibold text-white'>
               Eventos en vivo
             </h3>
           </div>
@@ -90,7 +90,7 @@ export const LiveFeedSidebar: React.FC = () => {
       {liveBets.length > 0 && (
         <div className='panel-card rounded-lg p-4'>
           <div className='mb-3 flex items-center justify-between border-b border-white/10 pb-2.5'>
-            <h4 className='flex items-center gap-1.5 text-xs font-semibold tracking-wider text-slate-300 uppercase'>
+            <h4 className='flex items-center gap-1.5 text-xs font-semibold text-slate-300'>
               <Bell className='h-3.5 w-3.5 text-brand' />
               Condiciones pendientes
             </h4>

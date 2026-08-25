@@ -183,7 +183,7 @@ export const AuthModal: React.FC = () => {
         <button
           type='submit'
           disabled={loading}
-          className='w-full py-2.5 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/50 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 mt-4 disabled:opacity-60'
+          className='w-full py-2.5 rounded-lg bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-black/30 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 mt-4 disabled:opacity-60'
         >
           <span>{mode === 'LOGIN' ? 'Entrar a La Fija' : 'Crear Cuenta'}</span>
           <ArrowRight className='w-4 h-4' />

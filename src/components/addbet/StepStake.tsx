@@ -57,7 +57,7 @@ export const StepStake: React.FC<StepStakeProps> = ({
       {/* Casa de apuestas */}
       <div className='space-y-2'>
         <div className='flex items-center justify-between'>
-          <span className='text-[11px] font-bold text-slate-300 uppercase tracking-wider font-mono'>
+          <span className='text-[11px] font-semibold text-slate-300'>
             Casa de Apuestas:{' '}
             <span className='text-orange-400'>{bookmaker}</span>
           </span>
@@ -73,7 +73,7 @@ export const StepStake: React.FC<StepStakeProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🇦🇷 Argentina
+              Argentina
             </button>
             <button
               type='button'
@@ -85,7 +85,7 @@ export const StepStake: React.FC<StepStakeProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🌐 Global
+              Global
             </button>
           </div>
         </div>
@@ -226,7 +226,7 @@ export const StepStake: React.FC<StepStakeProps> = ({
 
       {/* Preview del boleto antes de guardar */}
       <div className='rounded border border-white/10 bg-panel/40 p-3'>
-        <span className='mb-2 flex items-center gap-1.5 text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
+        <span className='mb-2 flex items-center gap-1.5 text-xs font-semibold text-white'>
           <ClipboardList className='w-3.5 h-3.5' />
           Tu boleto ({totalSelections} selección
           {totalSelections === 1 ? '' : 'es'}
@@ -273,7 +273,7 @@ export const StepStake: React.FC<StepStakeProps> = ({
         <button
           type='submit'
           disabled={!canSave}
-          className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
+          className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-black/30 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
         >
           <Zap className='w-4 h-4 fill-white' />
           Guardar Apuesta

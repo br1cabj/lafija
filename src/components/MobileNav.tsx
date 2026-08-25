@@ -84,7 +84,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       <button
         onClick={onOpenAddModal}
         aria-label='Crear apuesta'
-        className='w-12 h-12 -mt-5 rounded-full bg-linear-to-tr from-brand to-orange-400 text-white flex items-center justify-center shadow-lg shadow-orange-950/60 border-2 border-base active:scale-95 transition-all'
+        className='w-12 h-12 -mt-5 rounded-full bg-brand text-white flex items-center justify-center shadow-lg shadow-black/40 active:scale-95 transition-all'
       >
         <Plus className='w-6 h-6 stroke-3' />
       </button>

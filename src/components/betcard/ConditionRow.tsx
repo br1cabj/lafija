@@ -76,7 +76,7 @@ export const ConditionRow: React.FC<ConditionRowProps> = ({
               return (
                 <span
                   title={`Trackeado automáticamente con datos reales: ${API_MARKET_LABELS[apiCategory]}`}
-                  className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-sky-500/25 bg-sky-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-sky-300 uppercase'
+                  className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-white/10 bg-white/5 px-1 py-px text-[9px] font-semibold tracking-wider text-slate-400 uppercase'
                 >
                   <Zap className='h-2.5 w-2.5 shrink-0' />
                   {API_MARKET_LABELS[apiCategory]}
@@ -87,7 +87,7 @@ export const ConditionRow: React.FC<ConditionRowProps> = ({
               return (
                 <span
                   title={`Sin coincidencia con la API: "${cond.market}" — seguimiento manual con + / -`}
-                  className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-amber-500/25 bg-amber-500/10 px-1 py-px text-[9px] font-semibold tracking-wider text-amber-400/90 uppercase'
+                  className='mb-0.5 inline-flex max-w-full items-center gap-1 truncate rounded-sm border border-amber-500/20 bg-amber-500/5 px-1 py-px text-[9px] font-semibold tracking-wider text-amber-400/80 uppercase'
                 >
                   <Hand className='h-2.5 w-2.5 shrink-0' />
                   {cond.market}

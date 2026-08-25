@@ -108,7 +108,7 @@ export const StepSelections: React.FC<StepSelectionsProps> = ({
         </div>
       )}
 
-      <p className='text-xs font-bold text-orange-400 uppercase tracking-wider font-mono'>
+      <p className='text-xs font-semibold text-white'>
         Selecciones — {activeGroup.homeTeam} vs {activeGroup.awayTeam}
       </p>
 
@@ -197,19 +197,19 @@ export const StepSelections: React.FC<StepSelectionsProps> = ({
                     }
                     className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
                   />
-                  {(c.market.trim() || c.selection.trim()) && (
-                    <span
-                      title={
-                        auto
-                          ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
-                          : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
-                      }
-                      className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
-                        auto
-                          ? 'bg-sky-500/15 text-sky-300'
-                          : 'bg-amber-500/10 text-amber-400/90'
-                      }`}
-                    >
+                        {(c.market.trim() || c.selection.trim()) && (
+                          <span
+                            title={
+                              auto
+                                ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
+                                : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
+                            }
+                            className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
+                              auto
+                                ? 'bg-white/5 text-slate-400'
+                                : 'bg-amber-500/5 text-amber-400/80'
+                            }`}
+                          >
                       {auto
                         ? `⚡ ${API_MARKET_LABELS[apiCategory]}`
                         : '✋ MANUAL'}
