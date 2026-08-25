@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import type { Bet } from '../../types/bet';
 import { effectiveOdds, estimateLegOdds, hasEstimatedLegs } from '../../types/bet';
-import { formatOdds } from '../../utils/odds';
+import { formatMoney, formatOdds } from '../../utils/odds';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { useBets } from '../../context/BetContext';
@@ -121,7 +121,7 @@ export const SuspendDialog: React.FC<SuspendDialogProps> = ({
       <details className='mb-3 rounded-md border border-white/10 bg-panel'>
         <summary className='cursor-pointer px-3 py-2 text-xs font-medium text-slate-400 select-none hover:text-slate-200'>
           Cargar cuotas reales del ticket{' '}
-          <span className='text-slate-600'>(opcional — mejora el cálculo)</span>
+          <span className='text-slate-400'>(opcional — mejora el cálculo)</span>
         </summary>
         <div className='space-y-1.5 px-3 pb-3 pt-1'>
           {bet.conditions.map((cond) => {
@@ -163,7 +163,7 @@ export const SuspendDialog: React.FC<SuspendDialogProps> = ({
               </label>
             );
           })}
-          <p className='pt-1 text-[10px] leading-relaxed text-slate-600'>
+          <p className='pt-1 text-[10px] leading-relaxed text-slate-400'>
             Vacío = estimación automática ({estimateLegOdds(bet).toFixed(2)} por
             pata). Con las cuotas reales de tu ticket, la liquidación coincide
             con tu casa.
@@ -192,8 +192,7 @@ export const SuspendDialog: React.FC<SuspendDialogProps> = ({
               Retorno si ganás
             </span>
             <span className='font-mono-numbers font-bold text-emerald-400'>
-              {currencySymbol}
-              {(preview.odds * bet.stake).toFixed(2)}
+              {formatMoney(preview.odds * bet.stake, currencySymbol)}
             </span>
           </div>
         </div>

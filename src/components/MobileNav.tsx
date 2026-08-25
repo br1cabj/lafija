@@ -6,7 +6,6 @@ import {
   Radio,
   Plus,
   TrendingUp,
-  Zap,
   NotebookPen,
 } from 'lucide-react';
 
@@ -23,8 +22,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   onOpenAddModal,
   onOpenAnalyticsModal,
 }) => {
-  const { filter, setFilter, isSimulating, toggleSimulation, counts } =
-    useBets();
+  const { filter, setFilter, counts } = useBets();
   const liveCount = counts.live;
 
   return (
@@ -112,21 +110,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       >
         <TrendingUp className='w-5 h-5' />
         <span>Métricas</span>
-      </button>
-
-      {/* Tab 5: Simulador */}
-      <button
-        onClick={toggleSimulation}
-        aria-label={isSimulating ? 'Desactivar simulador' : 'Activar simulador'}
-        aria-pressed={isSimulating}
-        className={`flex flex-col items-center gap-1 text-[11px] font-semibold transition-colors ${
-          isSimulating ? 'text-emerald-400' : 'text-slate-400'
-        }`}
-      >
-        <Zap
-          className={`w-5 h-5 ${isSimulating ? 'text-emerald-400 fill-emerald-400 animate-bounce' : ''}`}
-        />
-        <span>{isSimulating ? 'ON' : 'OFF'}</span>
       </button>
     </nav>
   );

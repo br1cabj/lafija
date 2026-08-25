@@ -388,7 +388,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                         ? 'text-brand hover:bg-orange-500/10'
                         : reachable
                           ? 'text-slate-300 hover:bg-white/5'
-                          : 'text-slate-600'
+                          : 'text-slate-400'
                   }`}
                 >
                   <span
@@ -417,6 +417,8 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
         }}
         className='space-y-4'
       >
+      {/* Transición suave entre pasos */}
+      <div key={step} className='animate-step-in space-y-4'>
         {/* ================= PASO 1: PARTIDO ================= */}
         {step === 1 && (
           <StepMatch
@@ -497,6 +499,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
             onBack={() => goToStep(2)}
           />
         )}
+      </div>
       </form>
     </Modal>
   );

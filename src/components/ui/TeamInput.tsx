@@ -16,7 +16,7 @@ interface TeamInputProps {
  * Input de equipo con autocomplete contra /api/sports?teamsSearch=
  * Al elegir una sugerencia se guardan el nombre canónico y el ID:
  * el matching en vivo pasa a ser exacto, sin depender de cómo escribió
- * el usuario.
+ * el usuario. Navegable con teclado (↑ ↓ Enter Escape).
  */
 export const TeamInput: React.FC<TeamInputProps> = ({
   id,
@@ -26,6 +26,7 @@ export const TeamInput: React.FC<TeamInputProps> = ({
 }) => {
   const [suggestions, setSuggestions] = useState<TeamSuggestion[]>([]);
   const [open, setOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -37,6 +38,7 @@ export const TeamInput: React.FC<TeamInputProps> = ({
 
   const handleChange = (text: string) => {
     onChange(text, undefined);
+    setActiveIdx(0);
     if (timerRef.current) clearTimeout(timerRef.current);
     if (text.trim().length < 3) {
       setSuggestions([]);
@@ -56,6 +58,29 @@ export const TeamInput: React.FC<TeamInputProps> = ({
     setOpen(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open || suggestions.length === 0) return;
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setActiveIdx((prev) => Math.min(prev + 1, suggestions.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setActiveIdx((prev) => Math.max(prev - 1, 0));
+        break;
+      case 'Enter':
+        // El form solo envía en el paso 3; acá seleccionar gana
+        e.preventDefault();
+        pick(suggestions[activeIdx]);
+        break;
+      case 'Escape':
+        e.stopPropagation();
+        setOpen(false);
+        break;
+    }
+  };
+
   return (
     <div className='relative'>
       <label
@@ -69,7 +94,12 @@ export const TeamInput: React.FC<TeamInputProps> = ({
         type='text'
         required
         value={value}
+        role='combobox'
+        aria-expanded={open}
+        aria-controls={`${id}-listbox`}
+        aria-autocomplete='list'
         onChange={(e) => handleChange(e.target.value)}
+        onKeyDown={handleKeyDown}
         onFocus={() => {
           if (suggestions.length > 0) setOpen(true);
         }}
@@ -81,16 +111,24 @@ export const TeamInput: React.FC<TeamInputProps> = ({
         className='w-full rounded-md border border-white/10 bg-base px-3 py-2 text-sm text-white transition-colors focus:border-brand focus:outline-none'
       />
       {open && (
-        <ul className='absolute z-30 mt-1 w-full rounded-md border border-white/15 bg-elevated py-1 text-xs shadow-2xl'>
-          {suggestions.map((s) => (
-            <li key={s.id}>
+        <ul
+          id={`${id}-listbox`}
+          role='listbox'
+          aria-label={label}
+          className='absolute z-30 mt-1 w-full rounded-md border border-white/15 bg-elevated py-1 text-xs shadow-2xl'
+        >
+          {suggestions.map((s, i) => (
+            <li key={s.id} role='option' aria-selected={i === activeIdx}>
               <button
                 type='button'
                 onMouseDown={(e) => {
                   e.preventDefault();
                   pick(s);
                 }}
-                className='flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-white/5'
+                onMouseEnter={() => setActiveIdx(i)}
+                className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors ${
+                  i === activeIdx ? 'bg-white/10' : 'hover:bg-white/5'
+                }`}
               >
                 <span className='truncate text-slate-200'>{s.name}</span>
                 <span className='shrink-0 text-[10px] text-slate-500'>

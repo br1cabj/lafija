@@ -11,10 +11,12 @@ import { MobileNav } from './components/MobileNav';
 import { LiveFeedSidebar } from './components/LiveFeedSidebar';
 import type { Bet } from './types/bet';
 import { isSupabaseConfigured } from './services/supabase';
-import { Plus, ShieldCheck, Zap } from 'lucide-react';
+import { Plus, Search, ShieldCheck, Zap } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { ADS_ENABLED } from './config/ads';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ToastViewport } from './components/ui/Toasts';
+import { PageLoader } from './components/ui/PageLoader';
 import { PWAUpdateToast } from './components/PWAUpdateToast';
 import { tryNativeShare } from './utils/shareTicket';
 
@@ -51,6 +53,7 @@ const DashboardContent: React.FC = () => {
     bets,
     filter,
     searchQuery,
+    setSearchQuery,
     cloudSyncStatus,
     lastCloudSyncAt,
     retryCloudSync,
@@ -136,7 +139,7 @@ const DashboardContent: React.FC = () => {
       {/* Main Container */}
       <main className='mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-8 lg:py-8'>
         {view === 'notes' ? (
-          <Suspense fallback={null}>
+          <Suspense fallback={<PageLoader />}>
             <NotesView />
           </Suspense>
         ) : (
@@ -145,7 +148,7 @@ const DashboardContent: React.FC = () => {
             <StatsOverview />
 
             {/* Resultados en vivo de los partidos con apuestas activas */}
-            <Suspense fallback={null}>
+            <Suspense fallback={<PageLoader />}>
               <LiveResults />
             </Suspense>
 
@@ -174,22 +177,44 @@ const DashboardContent: React.FC = () => {
 
                 {filteredBets.length === 0 ? (
                   <div className='rounded-lg border border-dashed border-white/10 bg-surface p-10 text-center'>
-                    <div className='mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10 text-orange-400'>
-                      <Zap className='h-5 w-5' />
-                    </div>
-                    <h3 className='mb-1 text-sm font-semibold text-white'>
-                      No hay apuestas en esta vista
-                    </h3>
-                    <p className='mb-4 text-xs text-slate-400'>
-                      Añade una nueva apuesta para iniciar el seguimiento en
-                      vivo.
-                    </p>
-                    <Button
-                      variant='secondary'
-                      onClick={() => setIsAddModalOpen(true)}
-                    >
-                      Crear apuesta
-                    </Button>
+                    {searchQuery.trim() ? (
+                      <>
+                        <div className='mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/5 text-slate-400'>
+                          <Search className='h-5 w-5' />
+                        </div>
+                        <h3 className='mb-1 text-sm font-semibold text-white'>
+                          Sin resultados para «{searchQuery.trim()}»
+                        </h3>
+                        <p className='mb-4 text-xs text-slate-400'>
+                          Probá con otro equipo, liga o selección.
+                        </p>
+                        <Button
+                          variant='secondary'
+                          onClick={() => setSearchQuery('')}
+                        >
+                          Limpiar búsqueda
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className='mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500/10 text-orange-400'>
+                          <Zap className='h-5 w-5' />
+                        </div>
+                        <h3 className='mb-1 text-sm font-semibold text-white'>
+                          No hay apuestas en esta vista
+                        </h3>
+                        <p className='mb-4 text-xs text-slate-400'>
+                          Añade una nueva apuesta para iniciar el seguimiento en
+                          vivo.
+                        </p>
+                        <Button
+                          variant='secondary'
+                          onClick={() => setIsAddModalOpen(true)}
+                        >
+                          Crear apuesta
+                        </Button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   filteredBets.map((bet) => (
@@ -214,13 +239,13 @@ const DashboardContent: React.FC = () => {
 
       {/* Modals - AddBetModal se monta fresco en cada apertura */}
       {isAddModalOpen && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoader />}>
           <AddBetModal isOpen onClose={() => setIsAddModalOpen(false)} />
         </Suspense>
       )}
 
       {isAnalyticsModalOpen && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoader />}>
           <AnalyticsModal
             isOpen
             onClose={() => setIsAnalyticsModalOpen(false)}
@@ -229,7 +254,7 @@ const DashboardContent: React.FC = () => {
       )}
 
       {selectedBetForShare && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoader />}>
           <ShareTicketModal
             bet={selectedBetForShare}
             isOpen
@@ -239,7 +264,7 @@ const DashboardContent: React.FC = () => {
       )}
 
       {isAuthModalOpen && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<PageLoader />}>
           <AuthModal />
         </Suspense>
       )}
@@ -251,6 +276,9 @@ const DashboardContent: React.FC = () => {
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onOpenAnalyticsModal={() => setIsAnalyticsModalOpen(true)}
       />
+
+      {/* Feedback no bloqueante (éxitos/errores) */}
+      <ToastViewport />
 
       {/* Aviso de nueva versión del PWA */}
       <PWAUpdateToast />

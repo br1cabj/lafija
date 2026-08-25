@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ArrowRight, Check, Plus, Trash2 } from 'lucide-react';
+import { Button } from '../ui/Button';
 import type { ConditionField } from './types';
 import type { ConditionGroup } from './shared';
 import { KNOWN_MARKETS } from '../../data/markets';
@@ -241,7 +242,7 @@ export const StepSelections: React.FC<StepSelectionsProps> = ({
                   />
                 </label>
                 <span
-                  className='pb-[7px] text-xs font-mono text-slate-600'
+                  className='pb-[7px] text-xs font-mono text-slate-400'
                   aria-hidden
                 >
                   /
@@ -347,23 +348,14 @@ export const StepSelections: React.FC<StepSelectionsProps> = ({
 
       {/* Nav paso 2 */}
       <div className='flex items-center justify-between pt-2 border-t border-white/10'>
-        <button
-          type='button'
-          onClick={onBack}
-          className='flex items-center gap-1 px-4 py-2 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white'
-        >
-          <ArrowLeft className='w-4 h-4' />
+        <Button variant='ghost' onClick={onBack}>
+          <ArrowLeft className='h-4 w-4' />
           Atrás
-        </button>
-        <button
-          type='button'
-          onClick={onContinue}
-          disabled={!canContinue}
-          className='flex items-center gap-1.5 px-5 py-2 rounded bg-brand hover:bg-brand-hover text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-orange-950/40 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none'
-        >
+        </Button>
+        <Button variant='primary' onClick={onContinue} disabled={!canContinue}>
           Continuar
-          <ArrowRight className='w-4 h-4' />
-        </button>
+          <ArrowRight className='h-4 w-4' />
+        </Button>
       </div>
     </>
   );

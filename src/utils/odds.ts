@@ -174,3 +174,15 @@ export function convertOddsInput(
   if (decimal === null) return '';
   return formatOdds(decimal, toFormat);
 }
+
+/** Monto monetario con separador de miles es-AR y símbolo. */
+export function formatMoney(amount: number, symbol: string): string {
+  const safe = Number.isFinite(amount) ? amount : 0;
+  return (
+    symbol +
+    safe.toLocaleString('es-AR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}

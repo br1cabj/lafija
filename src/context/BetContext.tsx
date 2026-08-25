@@ -31,6 +31,7 @@ import {
 import { useAuth } from './AuthContext';
 import { canSyncToCloud } from '../services/supabase';
 import { fetchRemoteBets, syncBetsToCloud } from '../services/betsRepo';
+import { toast } from '../utils/toastBus';
 import confetti from 'canvas-confetti';
 
 export type { LiveEventLog };
@@ -270,6 +271,17 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       setCloudSyncStatus('error');
     }
   }, [cloudUserId, syncReady]);
+
+  // Toast de error de sync solo al ENTRAR en error (no en cada reintento)
+  const wasSyncErrorRef = useRef(false);
+  useEffect(() => {
+    if (cloudSyncStatus === 'error' && !wasSyncErrorRef.current) {
+      toast.error('Error de sincronización con la nube');
+      wasSyncErrorRef.current = true;
+    } else if (cloudSyncStatus === 'synced') {
+      wasSyncErrorRef.current = false;
+    }
+  }, [cloudSyncStatus]);
 
   // Debounced push of every local change while signed in.
   useEffect(() => {
@@ -519,9 +531,12 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       text: `Registrada nueva apuesta: Cuota ${newBet.odds.toFixed(2)} [Stake ${currencySymbol}${newBet.stake}]`,
       type: 'INFO',
     });
+
+    toast.success('Apuesta registrada');
   };
 
-  const deleteBet = (id: string) => setBets((prev) => prev.filter((b) => b.id !== id));
+  const deleteBet = (id: string) =>
+    setBets((prev) => prev.filter((b) => b.id !== id));
 
   const clearAllBets = () => {
     setBets([]);
@@ -563,14 +578,17 @@ export const BetProvider: React.FC<{ children: ReactNode }> = ({
       text: 'Apuesta cerrada exitosamente asegurando ganancia',
       type: 'INFO',
     });
+    toast.info('Cashout ejecutado');
   };
 
   const settleBet = (betId: string, outcome: 'WON' | 'LOST' | 'VOID') => {
     if (outcome === 'WON') {
       sounds.playWinSound();
       confetti({ particleCount: 100, spread: 90, origin: { y: 0.5 } });
+      toast.success('¡Apuesta ganada!');
     } else {
       sounds.playClickSound();
+      if (outcome === 'VOID') toast.info('Apuesta anulada — reembolso');
     }
     setBets((prev) =>
       prev.map((bet) => {

@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useBets } from '../context/BetContext';
 import { Search, X } from 'lucide-react';
 import clsx from 'clsx';
+import { formatMoney } from '../utils/odds';
 
 export const FilterBar: React.FC = () => {
   const {
@@ -27,9 +28,9 @@ export const FilterBar: React.FC = () => {
       }
     }
     return {
-      wonProfit: wonProfit.toFixed(2),
-      liveStake: liveStake.toFixed(2),
-      livePayout: livePayout.toFixed(2),
+      wonProfit,
+      liveStake,
+      livePayout,
     };
   }, [bets]);
 
@@ -119,8 +120,7 @@ export const FilterBar: React.FC = () => {
           <span className='flex items-center gap-2 font-semibold'>
             Ganancia neta:
             <span className='text-sm font-bold text-emerald-400'>
-              +{currencySymbol}
-              {wonProfit}
+              +{formatMoney(wonProfit, currencySymbol)}
             </span>
           </span>
           <span className='text-[11px] text-emerald-400/80'>
@@ -133,12 +133,10 @@ export const FilterBar: React.FC = () => {
         <div className='font-mono-numbers flex items-center justify-between rounded-md border border-orange-500/25 bg-orange-500/5 px-3 py-2.5 text-xs text-orange-300'>
           <span className='flex items-center gap-2 font-semibold'>
             <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-red-500' />
-            En juego: {currencySymbol}
-            {liveStake}
+            En juego: {formatMoney(liveStake, currencySymbol)}
           </span>
           <span className='font-bold text-orange-400'>
-            Retorno: {currencySymbol}
-            {livePayout}
+            Retorno: {formatMoney(livePayout, currencySymbol)}
           </span>
         </div>
       )}

@@ -1,9 +1,9 @@
-import { useState, useRef, memo } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import type { Bet, BetCondition, ExtraMatchInfo } from '../types/bet';
 import { effectiveOdds, hasEstimatedLegs } from '../types/bet';
 import { useBets } from '../context/BetContext';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
+import { formatMoney, formatOdds, ODDS_FORMAT_SHORT } from '../utils/odds';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import {
@@ -23,6 +23,8 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { normalizeName } from '../utils/liveSync';
+import { ConfirmDialog } from './ui/Dialogs';
+import { toast } from '../utils/toastBus';
 import { ConditionRow } from './betcard/ConditionRow';
 import { SuspendDialog } from './betcard/SuspendDialog';
 import { SwapPlayerDialog } from './betcard/SwapPlayerDialog';
@@ -53,9 +55,21 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
   const [swapConditionId, setSwapConditionId] = useState<string | null>(null);
   const [swapText, setSwapText] = useState('');
+  // Confirmaciones destructivas: eliminar apuesta / anular boleta
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmVoid, setConfirmVoid] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(menuRef, () => setShowMenu(false), showMenu);
+  // Escape cierra el menú de acciones
+  useEffect(() => {
+    if (!showMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowMenu(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showMenu]);
 
   // Las condiciones anuladas no cuentan para el progreso (aportan cuota 1.0)
   const activeConditions = bet.conditions.filter((c) => c.status !== 'VOID');
@@ -134,8 +148,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
           {bet.status === 'WON' && (
             <Badge variant='won'>
               <CheckCircle2 className='h-3 w-3' />
-              Ganada +{currencySymbol}
-              {(bet.potentialPayout - bet.stake).toFixed(2)}
+              Ganada +{formatMoney(bet.potentialPayout - bet.stake, currencySymbol)}
             </Badge>
           )}
 
@@ -148,8 +161,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
 
           {bet.status === 'CASHOUT' && (
             <Badge variant='cashout'>
-              Retirada ({currencySymbol}
-              {bet.cashoutValue?.toFixed(2)})
+              Retirada ({formatMoney(bet.cashoutValue ?? 0, currencySymbol)})
             </Badge>
           )}
 
@@ -207,7 +219,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
             </button>
 
             {showMenu && (
-              <div className='absolute right-0 top-9 z-20 w-44 rounded-lg border border-white/15 bg-elevated py-1 text-xs shadow-2xl'>
+              <div role='menu' aria-label='Acciones de la apuesta' className='absolute right-0 top-9 z-20 w-44 rounded-lg border border-white/15 bg-elevated py-1 text-xs shadow-2xl'>
                 {bet.status === 'PENDING' && (
                   <button
                     onClick={() => {
@@ -269,8 +281,8 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
                 {bet.status === 'PENDING' && (
                   <button
                     onClick={() => {
-                      settleBet(bet.id, 'VOID');
                       setShowMenu(false);
+                      setConfirmVoid(true);
                     }}
                     className='flex w-full items-center gap-2 px-3 py-2 text-left text-slate-200 transition-colors hover:bg-white/5'
                   >
@@ -296,8 +308,8 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
 
                 <button
                   onClick={() => {
-                    deleteBet(bet.id);
                     setShowMenu(false);
+                    setConfirmDelete(true);
                   }}
                   className='flex w-full items-center gap-2 border-t border-white/10 px-3 py-2 text-left text-red-400 transition-colors hover:bg-red-950/40'
                 >
@@ -408,8 +420,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
             Stake
           </span>
           <span className='text-xs font-bold text-white'>
-            {currencySymbol}
-            {bet.stake.toFixed(2)}
+            {formatMoney(bet.stake, currencySymbol)}
           </span>
         </div>
         <div className='text-center'>
@@ -438,8 +449,7 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
             Retorno
           </span>
           <span className='text-xs font-bold text-emerald-400'>
-            {currencySymbol}
-            {effPayout.toFixed(2)}
+            {formatMoney(effPayout, currencySymbol)}
           </span>
         </div>
       </div>
@@ -528,11 +538,32 @@ function BetCardComponent({ bet, onShare, isSharing = false }: BetCardProps) {
             onClick={() => cashoutBet(bet.id)}
             className='font-mono-numbers rounded-md bg-brand px-3.5 py-1.5 text-xs font-bold text-white transition-colors duration-150 hover:bg-brand-hover'
           >
-            Retirar {currencySymbol}
-            {bet.cashoutValue.toFixed(2)}
+            Retirar {formatMoney(bet.cashoutValue, currencySymbol)}
           </button>
         )}
       </div>
+
+      {/* Confirmaciones destructivas */}
+      <ConfirmDialog
+        isOpen={confirmDelete}
+        title='Eliminar apuesta'
+        message='Se borra de este dispositivo y de la nube. Esta acción no se puede deshacer.'
+        confirmLabel='Eliminar'
+        destructive
+        onConfirm={() => {
+          deleteBet(bet.id);
+          toast.info('Apuesta eliminada');
+        }}
+        onClose={() => setConfirmDelete(false)}
+      />
+      <ConfirmDialog
+        isOpen={confirmVoid}
+        title='Anular apuesta'
+        message='La boleta pasa a VOID: el stake se devuelve como reembolso y no cuenta como ganada ni perdida.'
+        confirmLabel='Anular apuesta'
+        onConfirm={() => settleBet(bet.id, 'VOID')}
+        onClose={() => setConfirmVoid(false)}
+      />
 
       {/* Diálogo: suspensión del partido */}
       <SuspendDialog

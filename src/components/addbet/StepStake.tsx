@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, ArrowLeft, ClipboardList, Zap } from 'lucide-react';
+import { Button } from '../ui/Button';
 import type { ConditionGroup } from './shared';
 import type { OddsFormat } from '../../utils/odds';
 import {
@@ -265,14 +266,10 @@ export const StepStake: React.FC<StepStakeProps> = ({
 
       {/* Nav paso 3 */}
       <div className='flex items-center justify-between pt-2 border-t border-white/10'>
-        <button
-          type='button'
-          onClick={onBack}
-          className='flex items-center gap-1 px-4 py-2 rounded text-xs font-semibold uppercase text-slate-400 hover:text-white'
-        >
-          <ArrowLeft className='w-4 h-4' />
+        <Button variant='ghost' onClick={onBack}>
+          <ArrowLeft className='h-4 w-4' />
           Atrás
-        </button>
+        </Button>
         <button
           type='submit'
           disabled={!canSave}
