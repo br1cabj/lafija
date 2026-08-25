@@ -385,7 +385,7 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       ariaLabel='Registrar nueva apuesta'
-      maxWidthClass='max-w-lg'
+      maxWidthClass='max-w-xl'
       fullscreenOnMobile
     >
       {/* Header compacto */}
@@ -718,10 +718,12 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                 const apiCategory = detectApiCategory(c.market, c.selection);
                 const auto = apiCategory !== null;
                 return (
-                    <div
-                      key={cIdx}
-                      className='min-w-0 p-2.5 bg-base rounded border border-white/10 flex flex-col sm:flex-row gap-2.5 items-start sm:items-center'
-                    >
+                  <div
+                    key={cIdx}
+                    className='min-w-0 p-3 bg-base rounded border border-white/10 space-y-2.5'
+                  >
+                    {/* Línea 1: mercado y selección, uno al lado del otro */}
+                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                       <input
                         type='text'
                         list='abm-market-options'
@@ -731,48 +733,52 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                         onChange={(e) =>
                           handleConditionChange(cIdx, 'market', e.target.value)
                         }
-                        className='w-full sm:w-1/3 min-w-0 bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
+                        className='w-full min-w-0 bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
                       />
-
-                      <div className='sm:w-1/3 w-full min-w-0'>
-                      <input
-                        type='text'
-                        aria-label={`Selección condición ${cIdx + 1}`}
-                        placeholder='Selección'
-                        value={c.selection}
-                        onChange={(e) =>
-                          handleConditionChange(cIdx, 'selection', e.target.value)
-                        }
-                        className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
-                      />
-                      {(c.market.trim() || c.selection.trim()) && (
-                        <span
-                          title={
-                            auto
-                              ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
-                              : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
+                      <div className='min-w-0'>
+                        <input
+                          type='text'
+                          aria-label={`Selección condición ${cIdx + 1}`}
+                          placeholder='Selección'
+                          value={c.selection}
+                          onChange={(e) =>
+                            handleConditionChange(cIdx, 'selection', e.target.value)
                           }
-                          className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
-                            auto
-                              ? 'bg-sky-500/15 text-sky-300'
-                              : 'bg-amber-500/10 text-amber-400/90'
-                          }`}
-                        >
-                          {auto
-                            ? `⚡ ${API_MARKET_LABELS[apiCategory]}`
-                            : '✋ MANUAL'}
-                        </span>
-                      )}
+                          className='w-full bg-panel border border-white/10 rounded px-2.5 py-1.5 text-xs text-white focus:border-brand focus:outline-none'
+                        />
+                        {(c.market.trim() || c.selection.trim()) && (
+                          <span
+                            title={
+                              auto
+                                ? `Trackeado automático con datos reales: ${API_MARKET_LABELS[apiCategory]}`
+                                : 'Sin coincidencia con la API: actualizala manualmente con los botones + / -'
+                            }
+                            className={`mt-1 inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wide ${
+                              auto
+                                ? 'bg-sky-500/15 text-sky-300'
+                                : 'bg-amber-500/10 text-amber-400/90'
+                            }`}
+                          >
+                            {auto
+                              ? `⚡ ${API_MARKET_LABELS[apiCategory]}`
+                              : '✋ MANUAL'}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                      <div className='flex items-center gap-1.5 sm:w-1/3 min-w-0 justify-end'>
-                      <div className='flex items-center gap-1 text-xs font-mono'>
+                    {/* Línea 2: valores etiquetados + acciones */}
+                    <div className='flex items-end flex-wrap gap-x-2.5 gap-y-2'>
+                      <label className='flex flex-col gap-0.5'>
+                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
+                          Actual
+                        </span>
                         <input
                           type='number'
                           step='0.5'
                           min='0'
                           aria-label='Valor actual'
-                          placeholder='Actual'
+                          placeholder='0'
                           value={c.currentValue}
                           onChange={(e) =>
                             handleConditionChange(
@@ -781,15 +787,22 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                               parseFloat(e.target.value) || 0,
                             )
                           }
-                          className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-white text-center font-mono-numbers'
+                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-white text-center font-mono-numbers focus:border-brand focus:outline-none'
                         />
-                        <span>/</span>
+                      </label>
+                      <span className='pb-[7px] text-xs font-mono text-slate-600' aria-hidden>
+                        /
+                      </span>
+                      <label className='flex flex-col gap-0.5'>
+                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
+                          Meta
+                        </span>
                         <input
                           type='number'
                           step='0.5'
                           min='0.5'
                           aria-label='Valor objetivo'
-                          placeholder='Meta'
+                          placeholder='8.5'
                           value={c.targetValue}
                           onChange={(e) =>
                             handleConditionChange(
@@ -798,15 +811,20 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                               parseFloat(e.target.value) || 1,
                             )
                           }
-                          className='w-14 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold'
+                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-orange-400 text-center font-mono-numbers font-bold focus:border-brand focus:outline-none'
                         />
+                      </label>
+                      <label className='flex flex-col gap-0.5'>
+                        <span className='text-[9px] font-semibold uppercase tracking-wide text-slate-500'>
+                          Cuota sel.
+                        </span>
                         <input
                           type='number'
                           step='0.01'
                           min='1'
                           aria-label='Cuota de la selección (opcional)'
                           title='Cuota individual — permite recalcular la apuesta si una condición se anula'
-                          placeholder='x'
+                          placeholder='—'
                           value={c.odds ?? ''}
                           onChange={(e) => {
                             const raw = e.target.value;
@@ -822,36 +840,38 @@ export const AddBetModal: React.FC<AddBetModalProps> = ({
                               ),
                             );
                           }}
-                          className='w-12 bg-panel border border-white/10 rounded px-1 py-1.5 text-xs text-slate-300 text-center font-mono-numbers'
+                          className='w-16 bg-panel border border-white/10 rounded px-1.5 py-1.5 text-xs text-slate-300 text-center font-mono-numbers focus:border-brand focus:outline-none'
                         />
-                      </div>
+                      </label>
 
-                      <button
-                        type='button'
-                        role='switch'
-                        aria-checked={Boolean(c.superSub)}
-                        aria-label='Super Sub: la línea hereda al suplente'
-                        title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
-                        onClick={() => toggleSuperSub(cIdx)}
-                        className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
-                          c.superSub
-                            ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
-                            : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        SS
-                      </button>
-
-                      {activeGroup.conditions.length > 1 && (
+                      <div className='ml-auto flex items-center gap-1 pb-0.5'>
                         <button
                           type='button'
-                          onClick={() => handleRemoveCondition(cIdx)}
-                          aria-label={`Eliminar condición ${cIdx + 1}`}
-                          className='p-1.5 text-slate-500 hover:text-red-400'
+                          role='switch'
+                          aria-checked={Boolean(c.superSub)}
+                          aria-label='Super Sub: la línea hereda al suplente'
+                          title={`${superSubLabel}: si tu jugador es sustituido, la línea hereda al suplente`}
+                          onClick={() => toggleSuperSub(cIdx)}
+                          className={`px-1.5 py-1 rounded text-[10px] font-semibold border transition-colors ${
+                            c.superSub
+                              ? 'bg-cyan-400/15 border-cyan-400/50 text-cyan-300'
+                              : 'bg-panel border-white/10 text-slate-500 hover:text-slate-300'
+                          }`}
                         >
-                          <Trash2 className='w-3.5 h-3.5' />
+                          SS
                         </button>
-                      )}
+
+                        {activeGroup.conditions.length > 1 && (
+                          <button
+                            type='button'
+                            onClick={() => handleRemoveCondition(cIdx)}
+                            aria-label={`Eliminar condición ${cIdx + 1}`}
+                            className='p-1.5 text-slate-500 hover:text-red-400'
+                          >
+                            <Trash2 className='w-3.5 h-3.5' />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
